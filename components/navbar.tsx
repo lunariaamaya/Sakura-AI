@@ -1,25 +1,44 @@
 "use client"
 
 import { useState } from "react"
+import { Globe, LogOut, Menu, UserRound, X } from "lucide-react"
+
 import { useI18n } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
-import { Globe, Menu, X } from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
-export function Navbar() {
+type AuthUser = {
+  name: string
+  email?: string
+  avatarUrl?: string
+}
+
+export function Navbar({ authUser }: { authUser?: AuthUser | null }) {
   const { t, locale, toggleLocale } = useI18n()
   const [mobileOpen, setMobileOpen] = useState(false)
 
   const navLinks = [
-    { key: "nav.features", href: "#features" },
-    { key: "nav.showcase", href: "#showcase" },
-    { key: "nav.reviews", href: "#reviews" },
-    { key: "nav.faq", href: "#faq" },
+    { key: "nav.features", href: "/#features" },
+    { key: "nav.showcase", href: "/#showcase" },
+    { key: "nav.reviews", href: "/#reviews" },
+    { key: "nav.faq", href: "/#faq" },
+    { key: "nav.pricing", href: "/pricing-v2" },
   ]
+
+  const loginLabel = locale === "zh" ? "登录" : "Sign in"
+  const signOutLabel = locale === "zh" ? "登出" : "Sign out"
 
   return (
     <header className="fixed top-0 right-0 left-0 z-40 border-b border-border/50 bg-background/80 backdrop-blur-xl">
       <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 lg:px-8">
-        <a href="#" className="flex items-center gap-2">
+        <a href="/" className="flex items-center gap-2">
           <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <path
@@ -32,9 +51,7 @@ export function Navbar() {
               />
             </svg>
           </div>
-          <span className="text-lg font-bold text-foreground">
-            Sakura AI
-          </span>
+          <span className="text-lg font-bold text-foreground">Sakura AI</span>
         </a>
 
         {/* Desktop nav */}
@@ -58,11 +75,63 @@ export function Navbar() {
             className="gap-1.5 text-muted-foreground hover:text-foreground"
           >
             <Globe className="size-4" />
-            <span className="text-xs font-medium">{locale === "zh" ? "EN" : "中文"}</span>
+            <span className="text-xs font-medium">
+              {locale === "zh" ? "EN" : "中文"}
+            </span>
           </Button>
-          <Button size="sm" className="hidden md:inline-flex">
-            {t("nav.start")}
+
+          {/* Auth area */}
+          {authUser ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="hidden items-center gap-2 rounded-md px-2 py-1 transition-colors hover:bg-accent md:flex"
+                >
+                  <Avatar className="size-7">
+                    <AvatarImage
+                      src={authUser.avatarUrl}
+                      alt={authUser.name}
+                      referrerPolicy="no-referrer"
+                    />
+                    <AvatarFallback>
+                      <UserRound className="size-4 text-muted-foreground" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="max-w-36 truncate text-sm font-medium">
+                    {authUser.name}
+                  </span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem asChild>
+                  <a href="/account">{locale === "zh" ? "账户" : "Account"}</a>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild variant="destructive">
+                  <a href="/auth/sign-out?next=/">
+                    <LogOut className="size-4" />
+                    {signOutLabel}
+                  </a>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              className="hidden md:inline-flex"
+            >
+              <a href="/auth/sign-in/google?next=/account">{loginLabel}</a>
+            </Button>
+          )}
+
+          {/* Existing CTA now points to /account */}
+          <Button asChild size="sm" className="hidden md:inline-flex">
+            <a href="/account">{t("nav.start")}</a>
           </Button>
+
           <Button
             variant="ghost"
             size="icon-sm"
@@ -89,9 +158,54 @@ export function Navbar() {
                 {t(link.key)}
               </a>
             ))}
-            <Button size="sm" className="mt-2 w-full">
-              {t("nav.start")}
+
+            <Button asChild size="sm" className="mt-2 w-full">
+              <a href="/account" onClick={() => setMobileOpen(false)}>
+                {t("nav.start")}
+              </a>
             </Button>
+
+            {authUser ? (
+              <>
+                <div className="mt-2 flex items-center gap-3 rounded-md border border-border/60 p-3">
+                  <Avatar className="size-9">
+                    <AvatarImage
+                      src={authUser.avatarUrl}
+                      alt={authUser.name}
+                      referrerPolicy="no-referrer"
+                    />
+                    <AvatarFallback>
+                      <UserRound className="size-4 text-muted-foreground" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium">
+                      {authUser.name}
+                    </div>
+                    {authUser.email ? (
+                      <div className="truncate text-xs text-muted-foreground">
+                        {authUser.email}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <Button variant="outline" size="sm" className="w-full" asChild>
+                  <a href="/auth/sign-out?next=/" onClick={() => setMobileOpen(false)}>
+                    {signOutLabel}
+                  </a>
+                </Button>
+              </>
+            ) : (
+              <Button variant="outline" size="sm" className="w-full" asChild>
+                <a
+                  href="/auth/sign-in/google?next=/account"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  {loginLabel}
+                </a>
+              </Button>
+            )}
           </div>
         </div>
       )}

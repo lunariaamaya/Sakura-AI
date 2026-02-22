@@ -5,13 +5,19 @@ import { useI18n } from "@/lib/i18n"
 export function Footer() {
   const { t } = useI18n()
 
+  const productLinks = [
+    { key: "footer.editor", href: "/#editor" },
+    { key: "footer.generator", href: "/#editor" },
+    { key: "footer.pricing", href: "/pricing-v2" },
+  ]
+
   return (
     <footer className="border-t border-border/50 bg-card/50">
       <div className="mx-auto max-w-7xl px-4 py-16 lg:px-8">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
           {/* Brand */}
           <div className="sm:col-span-2 lg:col-span-1">
-            <a href="#" className="mb-4 flex items-center gap-2">
+            <a href="/" className="mb-4 flex items-center gap-2">
               <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                   <path
@@ -49,10 +55,13 @@ export function Footer() {
               {t("footer.product")}
             </h3>
             <ul className="space-y-2.5">
-              {["footer.editor", "footer.generator", "footer.pricing"].map((key) => (
-                <li key={key}>
-                  <a href="#" className="text-sm text-muted-foreground transition-colors hover:text-primary">
-                    {t(key)}
+              {productLinks.map((link) => (
+                <li key={link.key}>
+                  <a
+                    href={link.href}
+                    className="text-sm text-muted-foreground transition-colors hover:text-primary"
+                  >
+                    {t(link.key)}
                   </a>
                 </li>
               ))}

@@ -17,6 +17,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "nav.showcase": "案例展示",
     "nav.reviews": "用户评价",
     "nav.faq": "常见问题",
+    "nav.pricing": "价格方案",
     "nav.start": "开始使用",
 
     // Hero
@@ -125,6 +126,7 @@ const translations: Record<Locale, Record<string, string>> = {
     "nav.showcase": "Showcase",
     "nav.reviews": "Reviews",
     "nav.faq": "FAQ",
+    "nav.pricing": "Pricing",
     "nav.start": "Get Started",
 
     // Hero
