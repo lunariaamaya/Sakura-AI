@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server"
 
+import { IMAGE_GENERATION_COST, consumeUserCredits, getUserCredits } from "@/lib/credits"
+import { createSupabaseServerClient } from "@/lib/supabase/server"
+
 export const runtime = "nodejs"
 
 const OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -56,6 +59,42 @@ async function fileToDataUrl(file: File): Promise<string> {
 }
 
 export async function POST(req: Request) {
+  const supabase = await createSupabaseServerClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return NextResponse.json(
+      {
+        error: "Please sign in with Google to generate images.",
+        code: "UNAUTHORIZED",
+        loginUrl: "/auth/sign-in/google?next=/#editor",
+      },
+      { status: 401 },
+    )
+  }
+
+  let currentCredits
+  try {
+    currentCredits = await getUserCredits(user.id)
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to load credits"
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+
+  if (currentCredits.totalCredits < IMAGE_GENERATION_COST) {
+    return NextResponse.json(
+      {
+        error: "Insufficient credits. Please recharge to continue.",
+        code: "INSUFFICIENT_CREDITS",
+        remainingCredits: currentCredits.totalCredits,
+      },
+      { status: 402 },
+    )
+  }
+
   const apiKey = process.env.OPENROUTER_API_KEY
   if (!apiKey) {
     return NextResponse.json(
@@ -155,5 +194,29 @@ export async function POST(req: Request) {
     )
   }
 
-  return NextResponse.json({ images })
+  let consumeResult
+  try {
+    consumeResult = await consumeUserCredits(user.id, IMAGE_GENERATION_COST)
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to consume credits"
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+
+  if (!consumeResult.ok) {
+    return NextResponse.json(
+      {
+        error: "Insufficient credits. Please recharge to continue.",
+        code: "INSUFFICIENT_CREDITS",
+        remainingCredits: consumeResult.balance.totalCredits,
+      },
+      { status: 402 },
+    )
+  }
+
+  return NextResponse.json({
+    images,
+    remainingCredits: consumeResult.balance.totalCredits,
+    spentCredits: IMAGE_GENERATION_COST,
+  })
 }

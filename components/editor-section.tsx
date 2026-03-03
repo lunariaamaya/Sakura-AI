@@ -16,6 +16,7 @@ export function EditorSection() {
   const [isDragOver, setIsDragOver] = useState(false)
   const [outputImages, setOutputImages] = useState<string[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [showRechargeHint, setShowRechargeHint] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFile = useCallback((file: File) => {
@@ -51,7 +52,36 @@ export function EditorSection() {
   const handleGenerate = async () => {
     if (!prompt.trim()) return
     if (mode === "img2img" && !uploadedFile) return
+
+    const authCheck = await fetch("/api/credits")
+    if (authCheck.status === 401) {
+      const data = (await authCheck.json().catch(() => null)) as
+        | { loginUrl?: string }
+        | null
+      window.location.href = data?.loginUrl ?? "/auth/sign-in/google?next=/#editor"
+      return
+    }
+
+    if (!authCheck.ok) {
+      setError("Failed to verify account state. Please try again.")
+      setShowRechargeHint(false)
+      return
+    }
+
+    const authData = (await authCheck.json()) as {
+      credits?: { totalCredits?: number }
+      costPerImage?: number
+    }
+    const totalCredits = authData?.credits?.totalCredits ?? 0
+    const costPerImage = authData?.costPerImage ?? 50
+    if (totalCredits < costPerImage) {
+      setError("Insufficient credits. Please recharge and try again.")
+      setShowRechargeHint(true)
+      return
+    }
+
     setError(null)
+    setShowRechargeHint(false)
     setIsGenerating(true)
     setOutputImages([])
 
@@ -67,18 +97,38 @@ export function EditorSection() {
 
       const data = await res.json().catch(() => null)
       if (!res.ok) {
+        if (res.status === 401) {
+          window.location.href =
+            data?.loginUrl ?? "/auth/sign-in/google?next=/#editor"
+          return
+        }
+        if (res.status === 402 || data?.code === "INSUFFICIENT_CREDITS") {
+          setError("Insufficient credits. Please recharge and try again.")
+          setShowRechargeHint(true)
+          return
+        }
         setError(data?.error ?? "Generate failed")
+        setShowRechargeHint(false)
         return
       }
 
       if (!Array.isArray(data?.images) || data.images.length === 0) {
         setError("No images returned")
+        setShowRechargeHint(false)
         return
       }
 
       setOutputImages(data.images)
+      if (typeof data?.remainingCredits === "number") {
+        window.dispatchEvent(
+          new CustomEvent("credits-updated", {
+            detail: { totalCredits: data.remainingCredits },
+          }),
+        )
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Generate failed")
+      setShowRechargeHint(false)
     } finally {
       setIsGenerating(false)
     }
@@ -337,6 +387,13 @@ export function EditorSection() {
               {error ? (
                 <div className="w-full rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-foreground">
                   {error}
+                  {showRechargeHint ? (
+                    <div className="mt-2">
+                      <a className="underline" href="/pricing-v2">
+                        Recharge now
+                      </a>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>

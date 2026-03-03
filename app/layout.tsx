@@ -6,6 +6,7 @@ import './globals.css'
 
 import { AppProviders } from "@/components/app-providers"
 import { Navbar } from "@/components/navbar"
+import { getUserCredits } from "@/lib/credits"
 import type { Locale } from "@/lib/i18n"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
 
@@ -67,11 +68,20 @@ export default async function RootLayout({
       }
     : null
 
+  let initialCredits: number | null = null
+  if (user) {
+    try {
+      initialCredits = (await getUserCredits(user.id)).totalCredits
+    } catch {
+      initialCredits = null
+    }
+  }
+
   return (
     <html lang={initialLocale} className="scroll-smooth">
       <body className="font-sans antialiased">
         <AppProviders initialLocale={initialLocale}>
-          <Navbar authUser={authUser} />
+          <Navbar authUser={authUser} initialCredits={initialCredits} />
           {children}
         </AppProviders>
         <Analytics />

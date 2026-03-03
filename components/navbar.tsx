@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Globe, LogOut, Menu, UserRound, X } from "lucide-react"
+import { useEffect, useState } from "react"
+import { Coins, Globe, LogOut, Menu, UserRound, X } from "lucide-react"
 
 import { useI18n } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
@@ -20,9 +20,50 @@ type AuthUser = {
   avatarUrl?: string
 }
 
-export function Navbar({ authUser }: { authUser?: AuthUser | null }) {
+export function Navbar({
+  authUser,
+  initialCredits,
+}: {
+  authUser?: AuthUser | null
+  initialCredits?: number | null
+}) {
   const { t, locale, toggleLocale } = useI18n()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [credits, setCredits] = useState<number | null>(initialCredits ?? null)
+
+  useEffect(() => {
+    if (!authUser) return
+
+    const syncCredits = async () => {
+      const res = await fetch("/api/credits")
+      if (!res.ok) return
+      const data = (await res.json()) as {
+        credits?: { totalCredits?: number }
+      }
+      if (typeof data?.credits?.totalCredits === "number") {
+        setCredits(data.credits.totalCredits)
+      }
+    }
+
+    void syncCredits()
+  }, [authUser])
+
+  useEffect(() => {
+    const onCreditsUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent<{ totalCredits?: number }>
+      if (typeof customEvent.detail?.totalCredits === "number") {
+        setCredits(customEvent.detail.totalCredits)
+      }
+    }
+
+    window.addEventListener("credits-updated", onCreditsUpdated as EventListener)
+    return () => {
+      window.removeEventListener(
+        "credits-updated",
+        onCreditsUpdated as EventListener,
+      )
+    }
+  }, [])
 
   const navLinks = [
     { key: "nav.features", href: "/#features" },
@@ -68,6 +109,15 @@ export function Navbar({ authUser }: { authUser?: AuthUser | null }) {
         </div>
 
         <div className="flex items-center gap-2">
+          {authUser ? (
+            <div className="hidden items-center gap-1 rounded-md border border-border/60 bg-secondary/70 px-2.5 py-1 text-xs md:inline-flex">
+              <Coins className="size-3.5 text-primary" />
+              <span className="font-medium text-foreground">
+                {credits ?? "--"} credits
+              </span>
+            </div>
+          ) : null}
+
           <Button
             variant="ghost"
             size="sm"
