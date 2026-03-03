@@ -1,10 +1,12 @@
 import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { cookies } from "next/headers"
 import './globals.css'
 
 import { AppProviders } from "@/components/app-providers"
 import { Navbar } from "@/components/navbar"
+import type { Locale } from "@/lib/i18n"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
 
 const _geist = Geist({ subsets: ["latin"] });
@@ -41,6 +43,10 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const cookieStore = await cookies()
+  const localeCookie = cookieStore.get("sakura-locale")?.value
+  const initialLocale: Locale = localeCookie === "en" ? "en" : "zh"
+
   const supabase = await createSupabaseServerClient()
   const {
     data: { user },
@@ -62,9 +68,9 @@ export default async function RootLayout({
     : null
 
   return (
-    <html lang="zh" className="scroll-smooth">
+    <html lang={initialLocale} className="scroll-smooth">
       <body className="font-sans antialiased">
-        <AppProviders>
+        <AppProviders initialLocale={initialLocale}>
           <Navbar authUser={authUser} />
           {children}
         </AppProviders>

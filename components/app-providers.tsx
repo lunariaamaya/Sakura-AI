@@ -2,9 +2,14 @@
 
 import type { ReactNode } from "react"
 
-import { I18nProvider } from "@/lib/i18n"
+import { I18nProvider, type Locale } from "@/lib/i18n"
 
-export function AppProviders({ children }: { children: ReactNode }) {
-  return <I18nProvider>{children}</I18nProvider>
+export function AppProviders({
+  children,
+  initialLocale,
+}: {
+  children: ReactNode
+  initialLocale: Locale
+}) {
+  return <I18nProvider initialLocale={initialLocale}>{children}</I18nProvider>
 }
-

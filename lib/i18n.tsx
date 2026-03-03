@@ -1,8 +1,15 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react"
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  type ReactNode,
+} from "react"
 
-type Locale = "zh" | "en"
+export type Locale = "zh" | "en"
 
 interface I18nContextType {
   locale: Locale
@@ -233,8 +240,43 @@ const translations: Record<Locale, Record<string, string>> = {
 
 const I18nContext = createContext<I18nContextType | undefined>(undefined)
 
-export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocale] = useState<Locale>("zh")
+const LOCALE_STORAGE_KEY = "sakura-locale"
+const LOCALE_COOKIE_KEY = "sakura-locale"
+
+function isLocale(value: string | null | undefined): value is Locale {
+  return value === "zh" || value === "en"
+}
+
+export function I18nProvider({
+  children,
+  initialLocale = "zh",
+}: {
+  children: ReactNode
+  initialLocale?: Locale
+}) {
+  const [locale, setLocale] = useState<Locale>(initialLocale)
+
+  useEffect(() => {
+    const storedLocale = window.localStorage.getItem(LOCALE_STORAGE_KEY)
+    if (isLocale(storedLocale) && storedLocale !== initialLocale) {
+      setLocale(storedLocale)
+      return
+    }
+
+    const localeFromCookie = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith(`${LOCALE_COOKIE_KEY}=`))
+      ?.split("=")[1]
+
+    if (isLocale(localeFromCookie) && localeFromCookie !== initialLocale) {
+      setLocale(localeFromCookie)
+    }
+  }, [initialLocale])
+
+  useEffect(() => {
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, locale)
+    document.cookie = `${LOCALE_COOKIE_KEY}=${locale}; Path=/; Max-Age=31536000; SameSite=Lax`
+  }, [locale])
 
   const t = useCallback(
     (key: string) => {
