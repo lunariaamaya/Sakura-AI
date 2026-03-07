@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" role="img" aria-label="Mountain showcase">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#091327"/>
+      <stop offset="100%" stop-color="#2f4f7f"/>
+    </linearGradient>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3f7b7f"/>
+      <stop offset="100%" stop-color="#1f3a3d"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="1000" fill="url(#sky)"/>
+  <circle cx="1240" cy="180" r="80" fill="#ffe6a8" opacity="0.9"/>
+  <polygon points="130,760 470,300 800,760" fill="#7fa2c9"/>
+  <polygon points="450,760 860,230 1280,760" fill="#5f86b1"/>
+  <polygon points="810,760 1160,360 1480,760" fill="#466b94"/>
+  <rect y="760" width="1600" height="240" fill="url(#ground)"/>
+  <text x="70" y="930" fill="#ffffff" font-size="52" font-family="Segoe UI, Arial, sans-serif" opacity="0.8">Sakura AI Showcase</text>
+</svg>

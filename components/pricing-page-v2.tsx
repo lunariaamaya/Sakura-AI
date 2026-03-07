@@ -105,7 +105,7 @@ export function PricingPageV2() {
   const header = {
     title: isZh ? "价格方案" : "Pricing",
     subtitle: isZh
-      ? "订阅与点数包，均可通过 PayPal 安全结账（当前默认沙箱环境）。"
+      ? "订阅与点数包都支持通过 PayPal 安全结算（默认沙盒环境）。"
       : "Subscriptions and credit packs. Secure checkout with PayPal (sandbox by default).",
   }
 
@@ -115,7 +115,7 @@ export function PricingPageV2() {
       description: isZh ? "快速体验 Sakura AI" : "Try Sakura AI quickly",
       priceLabel: "$0",
       features: [
-        isZh ? "基础图片编辑" : "Basic image editing",
+        isZh ? "基础图像编辑" : "Basic image editing",
         isZh ? "标准队列" : "Standard queue",
         isZh ? "社区支持" : "Community support",
       ],
@@ -135,7 +135,7 @@ export function PricingPageV2() {
         isZh ? "更稳定的生成体验" : "More stable generation",
         isZh ? "优先支持" : "Priority support",
       ],
-      ctaLabel: isZh ? "PayPal 结账" : "Checkout with PayPal",
+      ctaLabel: isZh ? "PayPal 结算" : "Checkout with PayPal",
       ctaType: "paypal",
     },
     {
@@ -144,7 +144,7 @@ export function PricingPageV2() {
       priceLabel: isZh ? "定制" : "Custom",
       features: [
         isZh ? "团队管理" : "Team management",
-        isZh ? "发票与对公支持" : "Invoices & business support",
+        isZh ? "发票与企业支持" : "Invoices & business support",
         isZh ? "定制集成" : "Custom integrations",
       ],
       ctaLabel: isZh ? "联系销售" : "Contact sales",
@@ -161,7 +161,7 @@ export function PricingPageV2() {
       amount: 0.99,
       features: [
         isZh ? "一次性购买，无自动续费" : "One-time purchase, no auto-renew",
-        isZh ? "点数不过期" : "Credits never expire",
+        isZh ? "点数永不过期" : "Credits never expire",
         isZh ? "解锁核心功能" : "Unlock core features",
       ],
       ctaLabel: isZh ? "PayPal 购买" : "Buy with PayPal",
@@ -176,7 +176,7 @@ export function PricingPageV2() {
       highlighted: true,
       features: [
         isZh ? "一次性购买，无自动续费" : "One-time purchase, no auto-renew",
-        isZh ? "点数不过期" : "Credits never expire",
+        isZh ? "点数永不过期" : "Credits never expire",
         isZh ? "更高处理优先级" : "Higher processing priority",
       ],
       ctaLabel: isZh ? "PayPal 购买" : "Buy with PayPal",
@@ -189,7 +189,7 @@ export function PricingPageV2() {
       amount: 9.99,
       features: [
         isZh ? "一次性购买，无自动续费" : "One-time purchase, no auto-renew",
-        isZh ? "点数不过期" : "Credits never expire",
+        isZh ? "点数永不过期" : "Credits never expire",
         isZh ? "优先支持" : "Priority support",
       ],
       ctaLabel: isZh ? "PayPal 购买" : "Buy with PayPal",
@@ -226,7 +226,7 @@ export function PricingPageV2() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm font-medium">
               <ShieldCheck className="size-4 text-primary" />
-              {isZh ? "安全结账" : "Secure checkout"}
+              {isZh ? "安全结算" : "Secure checkout"}
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1">
@@ -267,4 +267,3 @@ export function PricingPageV2() {
     </div>
   )
 }
-

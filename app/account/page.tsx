@@ -1,5 +1,15 @@
+import type { Metadata } from "next"
+
 import { Button } from "@/components/ui/button"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
+
+export const metadata: Metadata = {
+  title: "Account",
+  robots: {
+    index: false,
+    follow: false,
+  },
+}
 
 export default async function AccountPage() {
   const supabase = await createSupabaseServerClient()

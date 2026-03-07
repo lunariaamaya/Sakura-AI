@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server"
 
 import { paypalCreateOrder } from "@/lib/paypal"
+import { enforceRateLimit, enforceSameOrigin } from "@/lib/security"
 
 export const runtime = "nodejs"
 
 export async function POST(req: Request) {
+  const blockedByOrigin = enforceSameOrigin(req)
+  if (blockedByOrigin) return blockedByOrigin
+
+  const blockedByRateLimit = enforceRateLimit(req, "paypal-create-order", 30, 60_000)
+  if (blockedByRateLimit) return blockedByRateLimit
+
   try {
     const body = (await req.json()) as {
       amount?: string | number
@@ -21,6 +28,9 @@ export async function POST(req: Request) {
     }
 
     const currencyCode = (body.currencyCode ?? "USD").toUpperCase()
+    if (!/^[A-Z]{3}$/.test(currencyCode)) {
+      return NextResponse.json({ error: "Invalid currency code" }, { status: 400 })
+    }
 
     // PayPal expects a string with 2 decimals for most currencies (USD etc.)
     const amount = amountNum.toFixed(2)
@@ -28,7 +38,10 @@ export async function POST(req: Request) {
     const order = await paypalCreateOrder({
       amount,
       currencyCode,
-      description: body.description,
+      description:
+        typeof body.description === "string"
+          ? body.description.slice(0, 120)
+          : undefined,
     })
 
     return NextResponse.json({ id: order.id })

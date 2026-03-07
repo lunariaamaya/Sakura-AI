@@ -1,4 +1,14 @@
+import type { Metadata } from "next"
+
 import { Button } from "@/components/ui/button"
+
+export const metadata: Metadata = {
+  title: "Auth Error",
+  robots: {
+    index: false,
+    follow: false,
+  },
+}
 
 export default async function AuthErrorPage({
   searchParams,

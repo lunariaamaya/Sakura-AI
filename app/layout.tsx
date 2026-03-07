@@ -12,10 +12,49 @@ import { createSupabaseServerClient } from "@/lib/supabase/server"
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
 
 export const metadata: Metadata = {
-  title: 'Sakura AI - AI Image Editor',
-  description: 'Transform any image with simple text prompts. Advanced AI model for consistent character editing and scene preservation.',
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "Sakura AI - AI Image Editor",
+    template: "%s | Sakura AI",
+  },
+  description: "Transform any image with simple text prompts. Advanced AI model for consistent character editing and scene preservation.",
+  keywords: [
+    "AI image editor",
+    "text to image",
+    "image to image",
+    "AI photo editing",
+    "Sakura AI",
+  ],
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "Sakura AI - AI Image Editor",
+    description: "Transform any image with simple text prompts.",
+    url: "/",
+    siteName: "Sakura AI",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary",
+    title: "Sakura AI - AI Image Editor",
+    description: "Transform any image with simple text prompts.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
   icons: {
     icon: [
       {
@@ -46,7 +85,7 @@ export default async function RootLayout({
 }>) {
   const cookieStore = await cookies()
   const localeCookie = cookieStore.get("sakura-locale")?.value
-  const initialLocale: Locale = localeCookie === "en" ? "en" : "zh"
+  const initialLocale: Locale = localeCookie === "zh" ? "zh" : "en"
 
   const supabase = await createSupabaseServerClient()
   const {

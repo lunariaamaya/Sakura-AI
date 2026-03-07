@@ -8,6 +8,9 @@ export const metadata: Metadata = {
   title: "Pricing - Sakura AI",
   description:
     "Pick a plan and checkout securely with PayPal (sandbox/live supported).",
+  alternates: {
+    canonical: "/pricing-v2",
+  },
 }
 
 export default function PricingV2Page() {
@@ -21,4 +24,3 @@ export default function PricingV2Page() {
     </>
   )
 }
-

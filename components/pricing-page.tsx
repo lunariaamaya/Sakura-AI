@@ -101,14 +101,14 @@ export function PricingPage() {
   const copy = {
     title: isZh ? "价格方案" : "Pricing",
     subtitle: isZh
-      ? "选择适合你的方案。通过 PayPal 安全付款。"
+      ? "选择适合你的方案，支持 PayPal 安全付款。"
       : "Choose a plan that fits your workflow. Pay securely with PayPal.",
     tabs: {
       subscriptions: isZh ? "订阅" : "Subscriptions",
       packs: isZh ? "点数包" : "Credit Packs",
     },
     note: isZh
-      ? "当前版本会跳转到 PayPal 付款页面；自动开通/加点功能可后续接入。"
+      ? "当前版本会跳转到 PayPal 支付页面；自动开通和自动加点可在下一步接入。"
       : "For now, this button opens PayPal checkout; automatic unlock/crediting can be wired up next.",
   }
 
@@ -119,7 +119,7 @@ export function PricingPage() {
       price: "$0",
       priceHint: isZh ? "永久" : "forever",
       features: [
-        isZh ? "基础图片编辑" : "Basic image editing",
+        isZh ? "基础图像编辑" : "Basic image editing",
         isZh ? "标准生成速度" : "Standard generation speed",
         isZh ? "社区支持" : "Community support",
       ],
@@ -145,11 +145,11 @@ export function PricingPage() {
     },
     {
       name: isZh ? "企业版" : "Business",
-      description: isZh ? "团队/私有化/定制需求" : "Teams, custom needs, and SLAs",
+      description: isZh ? "团队、定制需求与 SLA" : "Teams, custom needs, and SLAs",
       price: isZh ? "定制" : "Custom",
       features: [
         isZh ? "团队管理" : "Team management",
-        isZh ? "发票与对公支持" : "Invoices and business support",
+        isZh ? "发票与企业支持" : "Invoices and business support",
         isZh ? "专属集成与支持" : "Custom integrations and support",
       ],
       ctaLabel: isZh ? "联系销售" : "Contact sales",
@@ -164,11 +164,11 @@ export function PricingPage() {
       name: isZh ? "入门点数包" : "Starter Pack",
       description: isZh ? "适合试用与轻度使用" : "Great for trying things out",
       price: isZh ? "200 点" : "200 credits",
-      priceHint: isZh ? "无过期" : "never expires",
+      priceHint: isZh ? "不过期" : "never expires",
       features: [
         isZh ? "一次性购买，无自动续费" : "One-time purchase, no auto-renew",
-        isZh ? "解锁全部基础功能" : "Unlock core features",
-        isZh ? "点数不过期" : "Credits never expire",
+        isZh ? "解锁核心功能" : "Unlock core features",
+        isZh ? "点数永不过期" : "Credits never expire",
       ],
       ctaLabel: isZh ? "用 PayPal 购买" : "Buy with PayPal",
       ctaHref: PAYPAL_CHECKOUT_URL,
@@ -178,12 +178,12 @@ export function PricingPage() {
       name: isZh ? "成长点数包" : "Growth Pack",
       description: isZh ? "适合日常创作" : "For regular creators",
       price: isZh ? "600 点" : "600 credits",
-      priceHint: isZh ? "无过期" : "never expires",
+      priceHint: isZh ? "不过期" : "never expires",
       badge: isZh ? "最热门" : "Most popular",
       features: [
         isZh ? "一次性购买，无自动续费" : "One-time purchase, no auto-renew",
         isZh ? "更高处理优先级" : "Higher processing priority",
-        isZh ? "点数不过期" : "Credits never expire",
+        isZh ? "点数永不过期" : "Credits never expire",
       ],
       ctaLabel: isZh ? "用 PayPal 购买" : "Buy with PayPal",
       ctaHref: PAYPAL_CHECKOUT_URL,
@@ -194,11 +194,11 @@ export function PricingPage() {
       name: isZh ? "专业点数包" : "Pro Pack",
       description: isZh ? "高频使用与团队共享" : "Heavy usage and teams",
       price: isZh ? "1500 点" : "1500 credits",
-      priceHint: isZh ? "无过期" : "never expires",
+      priceHint: isZh ? "不过期" : "never expires",
       features: [
         isZh ? "一次性购买，无自动续费" : "One-time purchase, no auto-renew",
         isZh ? "优先支持" : "Priority support",
-        isZh ? "点数不过期" : "Credits never expire",
+        isZh ? "点数永不过期" : "Credits never expire",
       ],
       ctaLabel: isZh ? "用 PayPal 购买" : "Buy with PayPal",
       ctaHref: PAYPAL_CHECKOUT_URL,
@@ -252,7 +252,7 @@ export function PricingPage() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <ShieldCheck className="size-4 text-primary" />
-                  {isZh ? "一次性购买 • 无自动续费 • 点数不过期" : "One-time purchase • No auto-renew • Never expires"}
+                  {isZh ? "一次性购买 · 无自动续费 · 永不过期" : "One-time purchase · No auto-renew · Never expires"}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <span className="inline-flex items-center gap-1">
@@ -288,4 +288,3 @@ export function PricingPage() {
     </div>
   )
 }
-

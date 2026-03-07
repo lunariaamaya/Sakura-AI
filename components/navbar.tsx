@@ -73,8 +73,8 @@ export function Navbar({
     { key: "nav.pricing", href: "/pricing-v2" },
   ]
 
-  const loginLabel = locale === "zh" ? "登录" : "Sign in"
-  const signOutLabel = locale === "zh" ? "登出" : "Sign out"
+  const loginLabel = t("nav.signIn")
+  const signOutLabel = t("nav.signOut")
 
   return (
     <header className="fixed top-0 right-0 left-0 z-40 border-b border-border/50 bg-background/80 backdrop-blur-xl">
@@ -95,7 +95,6 @@ export function Navbar({
           <span className="text-lg font-bold text-foreground">Sakura AI</span>
         </a>
 
-        {/* Desktop nav */}
         <div className="hidden items-center gap-1 md:flex">
           {navLinks.map((link) => (
             <a
@@ -113,7 +112,7 @@ export function Navbar({
             <div className="hidden items-center gap-1 rounded-md border border-border/60 bg-secondary/70 px-2.5 py-1 text-xs md:inline-flex">
               <Coins className="size-3.5 text-primary" />
               <span className="font-medium text-foreground">
-                {credits ?? "--"} credits
+                {credits ?? "--"} {t("nav.credits")}
               </span>
             </div>
           ) : null}
@@ -130,7 +129,6 @@ export function Navbar({
             </span>
           </Button>
 
-          {/* Auth area */}
           {authUser ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -155,7 +153,7 @@ export function Navbar({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem asChild>
-                  <a href="/account">{locale === "zh" ? "账户" : "Account"}</a>
+                  <a href="/account">{t("nav.account")}</a>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild variant="destructive">
@@ -177,7 +175,6 @@ export function Navbar({
             </Button>
           )}
 
-          {/* Existing CTA now points to /account */}
           <Button asChild size="sm" className="hidden md:inline-flex">
             <a href="/account">{t("nav.start")}</a>
           </Button>
@@ -194,7 +191,6 @@ export function Navbar({
         </div>
       </nav>
 
-      {/* Mobile nav */}
       {mobileOpen && (
         <div className="border-t border-border/50 bg-background/95 backdrop-blur-xl md:hidden">
           <div className="flex flex-col gap-1 p-4">

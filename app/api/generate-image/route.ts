@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { IMAGE_GENERATION_COST, consumeUserCredits, getUserCredits } from "@/lib/credits"
+import { enforceRateLimit, enforceSameOrigin, normalizePrompt } from "@/lib/security"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
@@ -59,6 +60,12 @@ async function fileToDataUrl(file: File): Promise<string> {
 }
 
 export async function POST(req: Request) {
+  const blockedByOrigin = enforceSameOrigin(req)
+  if (blockedByOrigin) return blockedByOrigin
+
+  const blockedByRateLimit = enforceRateLimit(req, "generate-image", 20, 60_000)
+  if (blockedByRateLimit) return blockedByRateLimit
+
   const supabase = await createSupabaseServerClient()
   const {
     data: { user },
@@ -69,7 +76,7 @@ export async function POST(req: Request) {
       {
         error: "Please sign in with Google to generate images.",
         code: "UNAUTHORIZED",
-        loginUrl: "/auth/sign-in/google?next=/#editor",
+        loginUrl: "/auth/sign-in/google?next=%2F%23editor",
       },
       { status: 401 },
     )
@@ -110,17 +117,20 @@ export async function POST(req: Request) {
   const contentType = req.headers.get("content-type") ?? ""
   if (contentType.includes("multipart/form-data")) {
     const form = await req.formData()
-    prompt = String(form.get("prompt") ?? "")
+    prompt = normalizePrompt(String(form.get("prompt") ?? ""))
     const file = form.get("image")
     if (file instanceof File) imageFile = file
   } else {
     const body = await req.json().catch(() => null) as any
-    prompt = String(body?.prompt ?? "")
+    prompt = normalizePrompt(String(body?.prompt ?? ""))
     if (typeof body?.imageDataUrl === "string") imageDataUrl = body.imageDataUrl
   }
 
-  if (!prompt.trim()) {
+  if (!prompt) {
     return NextResponse.json({ error: "Prompt is required" }, { status: 400 })
+  }
+  if (prompt.length > 1500) {
+    return NextResponse.json({ error: "Prompt too long (max 1500 chars)" }, { status: 400 })
   }
 
   if (imageFile) {
@@ -131,6 +141,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Image too large (max 10MB)" }, { status: 400 })
     }
     imageDataUrl = await fileToDataUrl(imageFile)
+  }
+
+  if (imageDataUrl && imageDataUrl.length > 15_000_000) {
+    return NextResponse.json({ error: "Image payload too large" }, { status: 400 })
   }
 
   const messages = [

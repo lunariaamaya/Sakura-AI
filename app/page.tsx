@@ -38,8 +38,23 @@ export default async function HomePage({
     redirect(`/auth/callback?${callbackParams.toString()}`)
   }
 
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    name: "Sakura AI",
+    applicationCategory: "MultimediaApplication",
+    operatingSystem: "Web",
+    description:
+      "AI image editor for text-guided image transformation and scene-preserving edits.",
+    url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  }
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
       <SakuraPetals />
       <main>
         <HeroSection />

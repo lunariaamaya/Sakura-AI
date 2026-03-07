@@ -1,14 +1,25 @@
 "use client"
 
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import { useI18n } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { ImageIcon, Type, Upload, X, Sparkles, Loader2 } from "lucide-react"
 
+type EditorMode = "img2img" | "txt2img"
+
+type EditorDraft = {
+  mode: EditorMode
+  prompt: string
+  uploadedImage: string | null
+  updatedAt: number
+}
+
+const EDITOR_DRAFT_KEY = "sakura-editor-draft-v1"
+
 export function EditorSection() {
   const { t } = useI18n()
-  const [mode, setMode] = useState<"img2img" | "txt2img">("img2img")
+  const [mode, setMode] = useState<EditorMode>("img2img")
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [prompt, setPrompt] = useState("")
@@ -18,6 +29,50 @@ export function EditorSection() {
   const [error, setError] = useState<string | null>(null)
   const [showRechargeHint, setShowRechargeHint] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const saveDraft = useCallback(
+    (nextDraft?: Partial<EditorDraft>) => {
+      const draft: EditorDraft = {
+        mode,
+        prompt,
+        uploadedImage,
+        updatedAt: Date.now(),
+        ...nextDraft,
+      }
+
+      if (!draft.prompt.trim() && !draft.uploadedImage) {
+        window.localStorage.removeItem(EDITOR_DRAFT_KEY)
+        return
+      }
+
+      window.localStorage.setItem(EDITOR_DRAFT_KEY, JSON.stringify(draft))
+    },
+    [mode, prompt, uploadedImage],
+  )
+
+  useEffect(() => {
+    const rawDraft = window.localStorage.getItem(EDITOR_DRAFT_KEY)
+    if (!rawDraft) return
+
+    try {
+      const parsed = JSON.parse(rawDraft) as Partial<EditorDraft>
+      if (parsed.mode === "img2img" || parsed.mode === "txt2img") {
+        setMode(parsed.mode)
+      }
+      if (typeof parsed.prompt === "string") {
+        setPrompt(parsed.prompt)
+      }
+      if (typeof parsed.uploadedImage === "string" && parsed.uploadedImage) {
+        setUploadedImage(parsed.uploadedImage)
+      }
+    } catch {
+      window.localStorage.removeItem(EDITOR_DRAFT_KEY)
+    }
+  }, [])
+
+  useEffect(() => {
+    saveDraft()
+  }, [mode, prompt, uploadedImage, saveDraft])
 
   const handleFile = useCallback((file: File) => {
     if (file.size > 10 * 1024 * 1024) return
@@ -37,7 +92,7 @@ export function EditorSection() {
       const file = e.dataTransfer.files[0]
       if (file) handleFile(file)
     },
-    [handleFile]
+    [handleFile],
   )
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -51,19 +106,20 @@ export function EditorSection() {
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return
-    if (mode === "img2img" && !uploadedFile) return
+    if (mode === "img2img" && !uploadedFile && !uploadedImage) return
 
     const authCheck = await fetch("/api/credits")
     if (authCheck.status === 401) {
+      saveDraft({ mode, prompt, uploadedImage })
       const data = (await authCheck.json().catch(() => null)) as
         | { loginUrl?: string }
         | null
-      window.location.href = data?.loginUrl ?? "/auth/sign-in/google?next=/#editor"
+      window.location.href = data?.loginUrl ?? "/auth/sign-in/google?next=%2F%23editor"
       return
     }
 
     if (!authCheck.ok) {
-      setError("Failed to verify account state. Please try again.")
+      setError(t("editor.error.authCheck"))
       setShowRechargeHint(false)
       return
     }
@@ -75,7 +131,7 @@ export function EditorSection() {
     const totalCredits = authData?.credits?.totalCredits ?? 0
     const costPerImage = authData?.costPerImage ?? 50
     if (totalCredits < costPerImage) {
-      setError("Insufficient credits. Please recharge and try again.")
+      setError(t("editor.error.insufficient"))
       setShowRechargeHint(true)
       return
     }
@@ -86,39 +142,59 @@ export function EditorSection() {
     setOutputImages([])
 
     try {
-      const formData = new FormData()
-      formData.append("prompt", prompt)
-      if (mode === "img2img" && uploadedFile) formData.append("image", uploadedFile)
+      const requestInit: RequestInit = { method: "POST" }
 
-      const res = await fetch("/api/generate-image", {
-        method: "POST",
-        body: formData,
-      })
+      if (mode === "img2img") {
+        if (uploadedFile) {
+          const formData = new FormData()
+          formData.append("prompt", prompt)
+          formData.append("image", uploadedFile)
+          requestInit.body = formData
+        } else {
+          requestInit.headers = { "Content-Type": "application/json" }
+          requestInit.body = JSON.stringify({
+            prompt,
+            imageDataUrl: uploadedImage,
+          })
+        }
+      } else {
+        requestInit.headers = { "Content-Type": "application/json" }
+        requestInit.body = JSON.stringify({ prompt })
+      }
+
+      const res = await fetch("/api/generate-image", requestInit)
 
       const data = await res.json().catch(() => null)
       if (!res.ok) {
         if (res.status === 401) {
+          saveDraft({ mode, prompt, uploadedImage })
           window.location.href =
-            data?.loginUrl ?? "/auth/sign-in/google?next=/#editor"
+            data?.loginUrl ?? "/auth/sign-in/google?next=%2F%23editor"
           return
         }
         if (res.status === 402 || data?.code === "INSUFFICIENT_CREDITS") {
-          setError("Insufficient credits. Please recharge and try again.")
+          setError(t("editor.error.insufficient"))
           setShowRechargeHint(true)
           return
         }
-        setError(data?.error ?? "Generate failed")
+        if (typeof data?.error === "string" && data.error.includes("No images")) {
+          setError(t("editor.error.noImages"))
+          setShowRechargeHint(false)
+          return
+        }
+        setError(t("editor.error.generate"))
         setShowRechargeHint(false)
         return
       }
 
       if (!Array.isArray(data?.images) || data.images.length === 0) {
-        setError("No images returned")
+        setError(t("editor.error.noImages"))
         setShowRechargeHint(false)
         return
       }
 
       setOutputImages(data.images)
+      window.localStorage.removeItem(EDITOR_DRAFT_KEY)
       if (typeof data?.remainingCredits === "number") {
         window.dispatchEvent(
           new CustomEvent("credits-updated", {
@@ -126,8 +202,8 @@ export function EditorSection() {
           }),
         )
       }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Generate failed")
+    } catch {
+      setError(t("editor.error.generate"))
       setShowRechargeHint(false)
     } finally {
       setIsGenerating(false)
@@ -147,9 +223,8 @@ export function EditorSection() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
-          {/* Input Panel */}
           <div className="rounded-2xl border border-primary/10 bg-card/60 p-6 shadow-[0_0_40px_rgba(244,114,182,0.15)] backdrop-blur-xl">
-            <Tabs value={mode} onValueChange={(v) => setMode(v as typeof mode)}>
+            <Tabs value={mode} onValueChange={(v) => setMode(v as EditorMode)}>
               <TabsList className="mb-6 w-full bg-secondary">
                 <TabsTrigger value="img2img" className="flex-1 gap-1.5">
                   <ImageIcon className="size-3.5" />
@@ -162,7 +237,6 @@ export function EditorSection() {
               </TabsList>
 
               <TabsContent value="img2img" className="space-y-4">
-                {/* Model selector */}
                 <div>
                   <label className="mb-2 block text-sm font-medium text-foreground">
                     {t("editor.model")}
@@ -175,7 +249,6 @@ export function EditorSection() {
                   </div>
                 </div>
 
-                {/* Image upload */}
                 <div>
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <label className="block text-sm font-medium text-foreground">
@@ -189,7 +262,7 @@ export function EditorSection() {
                       className="gap-1.5"
                     >
                       <Upload className="size-4" />
-                      Add Image
+                      {t("editor.addImage")}
                     </Button>
                   </div>
                   <div
@@ -228,7 +301,7 @@ export function EditorSection() {
                       <div className="relative w-full p-3">
                         <img
                           src={uploadedImage}
-                          alt="Uploaded reference"
+                          alt={t("editor.uploadedAlt")}
                           className="mx-auto max-h-[180px] rounded-lg object-contain"
                         />
                         <button
@@ -262,7 +335,6 @@ export function EditorSection() {
                   </div>
                 </div>
 
-                {/* Prompt input */}
                 <div>
                   <label className="mb-2 block text-sm font-medium text-foreground">
                     {t("editor.prompt")}
@@ -278,7 +350,7 @@ export function EditorSection() {
 
                 <Button
                   onClick={handleGenerate}
-                  disabled={isGenerating || !prompt.trim() || !uploadedFile}
+                  disabled={isGenerating || !prompt.trim() || (!uploadedFile && !uploadedImage)}
                   className="w-full gap-2"
                   size="lg"
                 >
@@ -290,7 +362,7 @@ export function EditorSection() {
                   ) : (
                     <>
                       <Sparkles className="size-4" />
-                      Generate Now
+                      {t("editor.generateNow")}
                     </>
                   )}
                 </Button>
@@ -334,7 +406,7 @@ export function EditorSection() {
                   ) : (
                     <>
                       <Sparkles className="size-4" />
-                      Generate Now
+                      {t("editor.generateNow")}
                     </>
                   )}
                 </Button>
@@ -342,10 +414,9 @@ export function EditorSection() {
             </Tabs>
           </div>
 
-          {/* Output Panel */}
           <div className="flex flex-col items-center justify-center rounded-2xl border border-primary/10 bg-card/60 p-6 backdrop-blur-xl">
             <h3 className="mb-6 text-lg font-semibold text-foreground">
-              Output Gallery
+              {t("editor.output")}
             </h3>
             <div className="flex w-full flex-1 flex-col items-center justify-center gap-4 py-6">
               {isGenerating ? (
@@ -364,7 +435,7 @@ export function EditorSection() {
                     >
                       <img
                         src={src}
-                        alt={`Generated ${idx + 1}`}
+                        alt={`${t("editor.generatedAlt")} ${idx + 1}`}
                         className="h-full w-full object-cover"
                       />
                     </div>
@@ -390,7 +461,7 @@ export function EditorSection() {
                   {showRechargeHint ? (
                     <div className="mt-2">
                       <a className="underline" href="/pricing-v2">
-                        Recharge now
+                        {t("editor.rechargeNow")}
                       </a>
                     </div>
                   ) : null}

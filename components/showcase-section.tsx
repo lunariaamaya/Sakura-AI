@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Zap, ArrowRight } from "lucide-react"
 
 const showcaseItems = [
-  { image: "/images/showcase-mountain.jpg", titleKey: "showcase.1.title", descKey: "showcase.1.desc" },
-  { image: "/images/showcase-garden.jpg", titleKey: "showcase.2.title", descKey: "showcase.2.desc" },
-  { image: "/images/showcase-beach.jpg", titleKey: "showcase.3.title", descKey: "showcase.3.desc" },
-  { image: "/images/showcase-aurora.jpg", titleKey: "showcase.4.title", descKey: "showcase.4.desc" },
+  { image: "/images/showcase-mountain.svg", titleKey: "showcase.1.title", descKey: "showcase.1.desc" },
+  { image: "/images/showcase-garden.svg", titleKey: "showcase.2.title", descKey: "showcase.2.desc" },
+  { image: "/images/showcase-beach.svg", titleKey: "showcase.3.title", descKey: "showcase.3.desc" },
+  { image: "/images/showcase-aurora.svg", titleKey: "showcase.4.title", descKey: "showcase.4.desc" },
 ]
 
 export function ShowcaseSection() {

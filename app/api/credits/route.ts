@@ -17,7 +17,7 @@ export async function GET() {
     return NextResponse.json(
       {
         error: "Authentication required",
-        loginUrl: "/auth/sign-in/google?next=/#editor",
+        loginUrl: "/auth/sign-in/google?next=%2F%23editor",
       },
       { status: 401 },
     )
