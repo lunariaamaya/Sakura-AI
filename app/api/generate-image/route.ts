@@ -10,6 +10,9 @@ const OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/compl
 const MODEL = "google/gemini-2.5-flash-image"
 
 function pickImageUrl(item: unknown): string | null {
+  if (typeof item === "string") {
+    return item
+  }
   if (!item || typeof item !== "object") return null
   const anyItem = item as any
 
@@ -21,6 +24,34 @@ function pickImageUrl(item: unknown): string | null {
     anyItem?.imageUrl
 
   return typeof url === "string" ? url : null
+}
+
+function b64ToDataUrl(value: unknown, mimeType?: unknown): string | null {
+  if (typeof value !== "string" || value.length === 0) return null
+  const mime =
+    typeof mimeType === "string" && mimeType.trim()
+      ? mimeType.trim()
+      : "image/png"
+  return `data:${mime};base64,${value}`
+}
+
+function collectImageUrlsFromString(content: string): string[] {
+  const urls: string[] = []
+
+  const dataUrls = content.match(/data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+/g)
+  if (dataUrls) urls.push(...dataUrls)
+
+  const markdownMatches = [...content.matchAll(/!\[[^\]]*]\((https?:\/\/[^)\s]+)\)/g)]
+  for (const match of markdownMatches) {
+    if (match[1]) urls.push(match[1])
+  }
+
+  const directImageLinks = [...content.matchAll(/https?:\/\/\S+\.(?:png|jpg|jpeg|webp|gif)(?:\?\S+)?/gi)]
+  for (const match of directImageLinks) {
+    if (match[0]) urls.push(match[0])
+  }
+
+  return urls
 }
 
 function extractImagesFromMessage(message: unknown): string[] {
@@ -47,8 +78,61 @@ function extractImagesFromMessage(message: unknown): string[] {
 
   // Fallback: try to find a data URL in string content.
   if (typeof anyMsg.content === "string") {
-    const matches = anyMsg.content.match(/data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+/g)
-    if (matches) urls.push(...matches)
+    urls.push(...collectImageUrlsFromString(anyMsg.content))
+  }
+
+  const contentArray = Array.isArray(anyMsg.content) ? anyMsg.content : []
+  for (const part of contentArray) {
+    if (typeof (part as any)?.text === "string") {
+      urls.push(...collectImageUrlsFromString((part as any).text))
+    }
+
+    const b64Image =
+      b64ToDataUrl((part as any)?.b64_json, (part as any)?.mime_type) ??
+      b64ToDataUrl((part as any)?.b64Json, (part as any)?.mimeType)
+    if (b64Image) urls.push(b64Image)
+  }
+
+  const messageB64Image =
+    b64ToDataUrl(anyMsg?.b64_json, anyMsg?.mime_type) ??
+    b64ToDataUrl(anyMsg?.b64Json, anyMsg?.mimeType)
+  if (messageB64Image) urls.push(messageB64Image)
+
+  return Array.from(new Set(urls))
+}
+
+function extractImagesFromResponse(data: any): string[] {
+  const urls: string[] = []
+
+  urls.push(...extractImagesFromMessage(data?.choices?.[0]?.message))
+
+  if (Array.isArray(data?.choices)) {
+    for (const choice of data.choices) {
+      urls.push(...extractImagesFromMessage(choice?.message))
+      urls.push(...extractImagesFromMessage(choice?.delta))
+    }
+  }
+
+  if (Array.isArray(data?.images)) {
+    for (const item of data.images) {
+      const url = pickImageUrl(item)
+      if (url) urls.push(url)
+    }
+  }
+
+  if (Array.isArray(data?.data)) {
+    for (const item of data.data) {
+      const url = pickImageUrl(item)
+      if (url) urls.push(url)
+      const b64Image =
+        b64ToDataUrl((item as any)?.b64_json, (item as any)?.mime_type) ??
+        b64ToDataUrl((item as any)?.b64Json, (item as any)?.mimeType)
+      if (b64Image) urls.push(b64Image)
+    }
+  }
+
+  if (typeof data?.output_text === "string") {
+    urls.push(...collectImageUrlsFromString(data.output_text))
   }
 
   return Array.from(new Set(urls))
@@ -193,9 +277,21 @@ export async function POST(req: Request) {
     )
   }
 
-  const data = JSON.parse(text)
+  let data: any
+  try {
+    data = JSON.parse(text)
+  } catch {
+    return NextResponse.json(
+      {
+        error: "OpenRouter returned non-JSON payload",
+        body: text.slice(0, 2000),
+      },
+      { status: 502 },
+    )
+  }
+
   const message = data?.choices?.[0]?.message
-  const images = extractImagesFromMessage(message)
+  const images = extractImagesFromResponse(data)
 
   if (images.length === 0) {
     return NextResponse.json(
