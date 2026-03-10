@@ -11,10 +11,47 @@ function safeUrl(raw: string | null): URL | null {
   }
 }
 
-function getExpectedOrigin(request: Request): URL {
+function parseOriginList(raw: string | undefined): URL[] {
+  if (!raw) return []
+  const parts = raw
+    .split(/[,\s]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+  const urls: URL[] = []
+  for (const part of parts) {
+    const parsed = safeUrl(part)
+    if (parsed) urls.push(parsed)
+  }
+  return urls
+}
+
+function getExpectedOrigins(request: Request): URL[] {
   const requestUrl = new URL(request.url)
   const configured = safeUrl(process.env.NEXT_PUBLIC_SITE_URL ?? null)
-  return configured ?? new URL(`${requestUrl.protocol}//${requestUrl.host}`)
+  const forwardedHost = request.headers.get("x-forwarded-host")
+  const forwardedProto = request.headers.get("x-forwarded-proto")
+  const forwardedOrigin = forwardedHost
+    ? safeUrl(`${forwardedProto ?? "https"}://${forwardedHost}`)
+    : null
+  const allowList = parseOriginList(process.env.ALLOWED_ORIGINS)
+
+  const candidates = [
+    configured,
+    forwardedOrigin,
+    new URL(`${requestUrl.protocol}//${requestUrl.host}`),
+    ...allowList,
+  ].filter(Boolean) as URL[]
+
+  const seen = new Set<string>()
+  const unique: URL[] = []
+  for (const url of candidates) {
+    const key = `${url.protocol}//${url.host}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    unique.push(url)
+  }
+
+  return unique
 }
 
 export function enforceSameOrigin(request: Request): NextResponse | null {
@@ -26,9 +63,10 @@ export function enforceSameOrigin(request: Request): NextResponse | null {
     return NextResponse.json({ error: "Invalid request origin" }, { status: 403 })
   }
 
-  const expected = getExpectedOrigin(request)
-  const sameOrigin =
-    origin.protocol === expected.protocol && origin.host === expected.host
+  const expected = getExpectedOrigins(request)
+  const sameOrigin = expected.some(
+    (url) => origin.protocol === url.protocol && origin.host === url.host
+  )
 
   if (!sameOrigin) {
     return NextResponse.json({ error: "Cross-site request blocked" }, { status: 403 })
