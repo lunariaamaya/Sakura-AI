@@ -27,6 +27,7 @@ type Props = {
   amount: number
   currencyCode?: string
   buttonLabel: string
+  sku: string
   disabled?: boolean
   className?: string
 }
@@ -51,6 +52,7 @@ export function PayPalCheckoutDialog({
   amount,
   currencyCode = "USD",
   buttonLabel,
+  sku,
   disabled,
   className,
 }: Props) {
@@ -102,13 +104,14 @@ export function PayPalCheckoutDialog({
 
       window.paypal.Buttons({
         createOrder: async () => {
+          if (!sku) {
+            throw new Error("Missing product sku")
+          }
           const res = await fetch("/api/paypal/create-order", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              amount: amountFixed,
-              currencyCode,
-              description: title,
+              sku,
             }),
           })
           const json = (await res.json()) as { id?: string; error?: string }
@@ -148,7 +151,7 @@ export function PayPalCheckoutDialog({
       cancelled = true
       window.clearInterval(interval)
     }
-  }, [open, clientId, currencyCode, amountFixed, title])
+  }, [open, clientId, currencyCode, amountFixed, title, sku])
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

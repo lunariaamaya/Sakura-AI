@@ -48,6 +48,7 @@ export async function paypalCreateOrder(input: {
   amount: string
   currencyCode: string
   description?: string
+  customId?: string
 }) {
   const accessToken = await getAccessToken()
 
@@ -62,6 +63,7 @@ export async function paypalCreateOrder(input: {
       purchase_units: [
         {
           description: input.description,
+          custom_id: input.customId,
           amount: {
             currency_code: input.currencyCode,
             value: input.amount,
@@ -104,4 +106,3 @@ export async function paypalCaptureOrder(orderId: string) {
 
   return res.json()
 }
-

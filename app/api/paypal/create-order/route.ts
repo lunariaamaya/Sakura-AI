@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 
 import { paypalCreateOrder } from "@/lib/paypal"
+import { PAYPAL_CATALOG, type PayPalSku } from "@/lib/paypal-catalog"
+import { createSupabaseServerClient } from "@/lib/supabase/server"
 import { enforceRateLimit, enforceSameOrigin } from "@/lib/security"
 
 export const runtime = "nodejs"
@@ -13,35 +15,42 @@ export async function POST(req: Request) {
   if (blockedByRateLimit) return blockedByRateLimit
 
   try {
-    const body = (await req.json()) as {
-      amount?: string | number
-      currencyCode?: string
-      description?: string
+    const body = (await req.json()) as { sku?: string }
+    const sku = body.sku
+
+    if (!sku || typeof sku !== "string") {
+      return NextResponse.json({ error: "Missing sku" }, { status: 400 })
     }
 
-    const amountNum = Number(body.amount)
-    if (!Number.isFinite(amountNum) || amountNum <= 0) {
-      return NextResponse.json(
-        { error: "Invalid amount" },
-        { status: 400 }
-      )
+    const catalogItem = PAYPAL_CATALOG[sku as PayPalSku]
+    if (!catalogItem) {
+      return NextResponse.json({ error: "Invalid sku" }, { status: 400 })
     }
 
-    const currencyCode = (body.currencyCode ?? "USD").toUpperCase()
-    if (!/^[A-Z]{3}$/.test(currencyCode)) {
-      return NextResponse.json({ error: "Invalid currency code" }, { status: 400 })
+    const supabase = await createSupabaseServerClient()
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    const customId = JSON.stringify({
+      user_id: user.id,
+      credit_amount: catalogItem.credits,
+      sku,
+    })
 
     // PayPal expects a string with 2 decimals for most currencies (USD etc.)
-    const amount = amountNum.toFixed(2)
+    const amount = Number(catalogItem.amount).toFixed(2)
 
     const order = await paypalCreateOrder({
       amount,
-      currencyCode,
-      description:
-        typeof body.description === "string"
-          ? body.description.slice(0, 120)
-          : undefined,
+      currencyCode: catalogItem.currencyCode,
+      description: catalogItem.description.slice(0, 120),
+      customId,
     })
 
     return NextResponse.json({ id: order.id })

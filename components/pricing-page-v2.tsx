@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { Check, CreditCard, ShieldCheck, Sparkles } from "lucide-react"
 
@@ -16,6 +16,7 @@ type Plan = {
   description: string
   priceLabel: string
   amount?: number
+  sku?: string
   badge?: string
   highlighted?: boolean
   features: string[]
@@ -85,6 +86,7 @@ function PlanCard({ plan }: { plan: Plan }) {
             title={plan.name}
             description={plan.description}
             amount={plan.amount}
+            sku={plan.sku ?? ""}
             buttonLabel={plan.ctaLabel}
             className="w-full"
           />
@@ -113,7 +115,7 @@ export function PricingPageV2() {
     {
       name: isZh ? "免费版" : "Free",
       description: isZh ? "快速体验 Sakura AI" : "Try Sakura AI quickly",
-      priceLabel: "$0",
+      priceLabel: "",
       features: [
         isZh ? "基础图像编辑" : "Basic image editing",
         isZh ? "标准队列" : "Standard queue",
@@ -126,7 +128,7 @@ export function PricingPageV2() {
     {
       name: isZh ? "专业版" : "Pro",
       description: isZh ? "更快处理 + 优先支持" : "Priority processing + support",
-      priceLabel: "$0.99",
+      priceLabel: ".99",
       amount: 0.99,
       badge: isZh ? "推荐" : "Popular",
       highlighted: true,
@@ -135,8 +137,9 @@ export function PricingPageV2() {
         isZh ? "更稳定的生成体验" : "More stable generation",
         isZh ? "优先支持" : "Priority support",
       ],
-      ctaLabel: isZh ? "PayPal 结算" : "Checkout with PayPal",
-      ctaType: "paypal",
+      ctaLabel: isZh ? "开始使用" : "Get started",
+      ctaType: "link",
+      href: "/account",
     },
     {
       name: isZh ? "企业版" : "Business",
@@ -159,6 +162,7 @@ export function PricingPageV2() {
       description: isZh ? "适合试用与轻度使用" : "Best for light usage",
       priceLabel: isZh ? "200 点" : "200 credits",
       amount: 0.99,
+      sku: "credits-starter-200",
       features: [
         isZh ? "一次性购买，无自动续费" : "One-time purchase, no auto-renew",
         isZh ? "点数永不过期" : "Credits never expire",
@@ -172,6 +176,7 @@ export function PricingPageV2() {
       description: isZh ? "适合日常创作" : "For regular creators",
       priceLabel: isZh ? "600 点" : "600 credits",
       amount: 4.99,
+      sku: "credits-growth-600",
       badge: isZh ? "最热门" : "Most popular",
       highlighted: true,
       features: [
@@ -187,6 +192,7 @@ export function PricingPageV2() {
       description: isZh ? "高频使用" : "For heavy usage",
       priceLabel: isZh ? "1500 点" : "1500 credits",
       amount: 9.99,
+      sku: "credits-pro-1500",
       features: [
         isZh ? "一次性购买，无自动续费" : "One-time purchase, no auto-renew",
         isZh ? "点数永不过期" : "Credits never expire",
