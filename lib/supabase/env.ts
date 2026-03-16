@@ -11,3 +11,7 @@ export function getSupabaseEnv() {
   return { url, anonKey }
 }
 
+export function isSupabaseBypassed() {
+  return process.env.SUPABASE_BYPASS === "1" || process.env.SUPABASE_BYPASS === "true"
+}
+

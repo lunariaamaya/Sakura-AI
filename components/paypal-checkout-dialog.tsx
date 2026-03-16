@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Loader2 } from "lucide-react"
 
+import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -133,6 +134,26 @@ export function PayPalCheckoutDialog({
           if (!res.ok) throw new Error(json.error || "Capture failed")
 
           setStatus({ type: "success" })
+
+          try {
+            const supabase = getSupabaseBrowserClient()
+            const { data } = await supabase.rpc("get_my_credits")
+            const row = Array.isArray(data) ? data[0] : data
+            const free = Number((row as any)?.free_credits ?? (row as any)?.freeCredits ?? 0)
+            const paid = Number((row as any)?.paid_credits ?? (row as any)?.paidCredits ?? 0)
+            const total = Number(
+              (row as any)?.total_credits ?? (row as any)?.totalCredits ?? (free + paid),
+            )
+            if (Number.isFinite(total)) {
+              window.dispatchEvent(
+                new CustomEvent("credits-updated", {
+                  detail: { totalCredits: total },
+                }),
+              )
+            }
+          } catch {
+            // Ignore refresh failures (credits can be fetched later).
+          }
         },
         onCancel: () => {
           setStatus({ type: "ready" })

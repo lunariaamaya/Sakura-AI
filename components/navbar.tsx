@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { Coins, Globe, LogOut, Menu, UserRound, X } from "lucide-react"
 
 import { useI18n } from "@/lib/i18n"
+import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -32,16 +33,27 @@ export function Navbar({
   const [credits, setCredits] = useState<number | null>(initialCredits ?? null)
 
   useEffect(() => {
-    if (!authUser) return
-
     const syncCredits = async () => {
-      const res = await fetch("/api/credits")
-      if (!res.ok) return
-      const data = (await res.json()) as {
-        credits?: { totalCredits?: number }
+      const supabase = getSupabaseBrowserClient()
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser()
+
+      if (userError || !user) {
+        setCredits(null)
+        return
       }
-      if (typeof data?.credits?.totalCredits === "number") {
-        setCredits(data.credits.totalCredits)
+
+      const { data, error } = await supabase.rpc("get_my_credits")
+      if (error || !data) return
+
+      const row = Array.isArray(data) ? data[0] : data
+      const free = Number((row as any)?.free_credits ?? (row as any)?.freeCredits ?? 0)
+      const paid = Number((row as any)?.paid_credits ?? (row as any)?.paidCredits ?? 0)
+      const total = Number((row as any)?.total_credits ?? (row as any)?.totalCredits ?? (free + paid))
+      if (Number.isFinite(total)) {
+        setCredits(total)
       }
     }
 

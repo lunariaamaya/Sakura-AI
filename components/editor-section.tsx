@@ -2,9 +2,11 @@
 
 import { useState, useCallback, useRef, useEffect } from "react"
 import { useI18n } from "@/lib/i18n"
+import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { ImageIcon, Type, Upload, X, Sparkles, Loader2 } from "lucide-react"
+import { PayPalCheckoutDialog } from "@/components/paypal-checkout-dialog"
 
 type EditorMode = "img2img" | "txt2img"
 
@@ -16,9 +18,22 @@ type EditorDraft = {
 }
 
 const EDITOR_DRAFT_KEY = "sakura-editor-draft-v1"
+const CREDIT_COST = Number(process.env.NEXT_PUBLIC_CREDIT_COST ?? 50)
+
+function extractTotalCredits(data: unknown): number {
+  if (!data) return 0
+  const row = Array.isArray(data) ? data[0] : data
+  const free = Number((row as any)?.free_credits ?? (row as any)?.freeCredits ?? 0)
+  const paid = Number((row as any)?.paid_credits ?? (row as any)?.paidCredits ?? 0)
+  const total = Number(
+    (row as any)?.total_credits ?? (row as any)?.totalCredits ?? (free + paid),
+  )
+  return Number.isFinite(total) ? total : 0
+}
 
 export function EditorSection() {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
+  const isZh = locale === "zh"
   const [mode, setMode] = useState<EditorMode>("img2img")
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
@@ -29,6 +44,12 @@ export function EditorSection() {
   const [error, setError] = useState<string | null>(null)
   const [showRechargeHint, setShowRechargeHint] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const rechargePack = {
+    title: isZh ? "入门点数包" : "Starter Pack",
+    description: isZh ? "200 点积分包" : "200 credits pack",
+    amount: 0.99,
+    sku: "credits-starter-200",
+  }
 
   const saveDraft = useCallback(
     (nextDraft?: Partial<EditorDraft>) => {
@@ -108,30 +129,43 @@ export function EditorSection() {
     if (!prompt.trim()) return
     if (mode === "img2img" && !uploadedFile && !uploadedImage) return
 
-    const authCheck = await fetch("/api/credits")
-    if (authCheck.status === 401) {
+    const supabase = getSupabaseBrowserClient()
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (userError || !user) {
       saveDraft({ mode, prompt, uploadedImage })
-      const data = (await authCheck.json().catch(() => null)) as
-        | { loginUrl?: string }
-        | null
-      window.location.href = data?.loginUrl ?? "/auth/sign-in/google?next=%2F%23editor"
+      window.location.href = "/auth/sign-in/google?next=%2F%23editor"
       return
     }
 
-    if (!authCheck.ok) {
+    const { data: creditsData, error: creditsError } = await supabase.rpc("get_my_credits")
+    if (creditsError) {
       setError(t("editor.error.authCheck"))
       setShowRechargeHint(false)
       return
     }
 
-    const authData = (await authCheck.json()) as {
-      credits?: { totalCredits?: number }
-      costPerImage?: number
-    }
-    const totalCredits = authData?.credits?.totalCredits ?? 0
-    const costPerImage = authData?.costPerImage ?? 50
-    if (totalCredits < costPerImage) {
+    const totalCredits = extractTotalCredits(creditsData)
+    if (totalCredits < CREDIT_COST) {
       setError(t("editor.error.insufficient"))
+      setShowRechargeHint(true)
+      return
+    }
+
+    const { error: consumeError } = await supabase.rpc("consume_credits", {
+      p_amount: CREDIT_COST,
+      p_remark: "使用AI功能",
+    })
+
+    if (consumeError) {
+      setError(
+        consumeError.message?.toLowerCase().includes("insufficient")
+          ? t("editor.error.insufficient")
+          : consumeError.message,
+      )
       setShowRechargeHint(true)
       return
     }
@@ -160,6 +194,11 @@ export function EditorSection() {
       } else {
         requestInit.headers = { "Content-Type": "application/json" }
         requestInit.body = JSON.stringify({ prompt })
+      }
+
+      requestInit.headers = {
+        ...(requestInit.headers ?? {}),
+        "x-credits-consumed": "1",
       }
 
       const res = await fetch("/api/generate-image", requestInit)
@@ -195,13 +234,13 @@ export function EditorSection() {
 
       setOutputImages(data.images)
       window.localStorage.removeItem(EDITOR_DRAFT_KEY)
-      if (typeof data?.remainingCredits === "number") {
-        window.dispatchEvent(
-          new CustomEvent("credits-updated", {
-            detail: { totalCredits: data.remainingCredits },
-          }),
-        )
-      }
+      const { data: latestCredits } = await supabase.rpc("get_my_credits")
+      const refreshedTotal = extractTotalCredits(latestCredits)
+      window.dispatchEvent(
+        new CustomEvent("credits-updated", {
+          detail: { totalCredits: refreshedTotal },
+        }),
+      )
     } catch {
       setError(t("editor.error.generate"))
       setShowRechargeHint(false)
@@ -460,9 +499,18 @@ export function EditorSection() {
                   {error}
                   {showRechargeHint ? (
                     <div className="mt-2">
-                      <a className="underline" href="/pricing-v2">
-                        {t("editor.rechargeNow")}
-                      </a>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <a className="underline" href="/pricing-v2">
+                          {t("editor.rechargeNow")}
+                        </a>
+                        <PayPalCheckoutDialog
+                          title={rechargePack.title}
+                          description={rechargePack.description}
+                          amount={rechargePack.amount}
+                          sku={rechargePack.sku}
+                          buttonLabel={isZh ? "PayPal 充值" : "Pay with PayPal"}
+                        />
+                      </div>
                     </div>
                   ) : null}
                 </div>

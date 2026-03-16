@@ -18,7 +18,7 @@ const nextConfig = {
       "font-src 'self' data:",
       "style-src 'self' 'unsafe-inline'",
       "script-src 'self' 'unsafe-inline' https://www.paypal.com https://www.paypalobjects.com https://www.googletagmanager.com https://va.vercel-scripts.com",
-      "connect-src 'self' https://openrouter.ai https://api-m.paypal.com https://api-m.sandbox.paypal.com https://www.paypal.com https://www.sandbox.paypal.com https://www.google-analytics.com https://vitals.vercel-insights.com",
+      "connect-src 'self' https://openrouter.ai https://api-m.paypal.com https://api-m.sandbox.paypal.com https://www.paypal.com https://www.sandbox.paypal.com https://www.google-analytics.com https://vitals.vercel-insights.com https://*.supabase.co wss://*.supabase.co",
       "frame-src https://www.paypal.com https://www.sandbox.paypal.com",
       "upgrade-insecure-requests",
     ].join("; ")
