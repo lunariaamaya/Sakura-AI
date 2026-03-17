@@ -1,5 +1,6 @@
-﻿"use client"
+"use client"
 
+import { useState } from "react"
 import { Check, CreditCard, ShieldCheck, Sparkles } from "lucide-react"
 
 import { useI18n } from "@/lib/i18n"
@@ -14,7 +15,9 @@ import { PayPalCheckoutDialog } from "@/components/paypal-checkout-dialog"
 type Plan = {
   name: string
   description: string
-  priceLabel: string
+  priceMain: string
+  priceSuffix?: string
+  priceDetail?: string
   amount?: number
   sku?: string
   badge?: string
@@ -24,6 +27,8 @@ type Plan = {
   ctaType: "paypal" | "link"
   href?: string
 }
+
+type BillingCycle = "monthly" | "yearly"
 
 function FeatureList({ features }: { features: string[] }) {
   return (
@@ -42,7 +47,7 @@ function PlanCard({ plan }: { plan: Plan }) {
   return (
     <Card
       className={cn(
-        "relative overflow-hidden border-border/60 bg-card/60 backdrop-blur-xl",
+        "relative flex h-full flex-col overflow-hidden border-border/60 bg-card/60 backdrop-blur-xl",
         plan.highlighted && "border-primary/40"
       )}
     >
@@ -68,19 +73,25 @@ function PlanCard({ plan }: { plan: Plan }) {
           ) : null}
         </div>
 
-        <div className="flex items-end gap-2">
-          <div className="text-3xl font-semibold tracking-tight">
-            {plan.priceLabel}
+        <div>
+          <div className="flex items-end gap-1.5">
+            <div className="text-3xl font-semibold tracking-tight">{plan.priceMain}</div>
+            {plan.priceSuffix ? (
+              <div className="pb-1 text-sm text-muted-foreground/80">{plan.priceSuffix}</div>
+            ) : null}
           </div>
+          {plan.priceDetail ? (
+            <div className="mt-1 text-xs text-muted-foreground/80">{plan.priceDetail}</div>
+          ) : null}
         </div>
       </CardHeader>
 
-      <CardContent className="relative">
+      <CardContent className="relative flex-1">
         <Separator className="mb-6 opacity-60" />
         <FeatureList features={plan.features} />
       </CardContent>
 
-      <CardFooter className="relative">
+      <CardFooter className="relative mt-auto">
         {plan.ctaType === "paypal" && typeof plan.amount === "number" ? (
           <PayPalCheckoutDialog
             title={plan.name}
@@ -103,100 +114,116 @@ function PlanCard({ plan }: { plan: Plan }) {
 export function PricingPageV2() {
   const { locale } = useI18n()
   const isZh = locale === "zh"
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly")
 
   const header = {
     title: isZh ? "价格方案" : "Pricing",
     subtitle: isZh
-      ? "订阅与点数包都支持通过 PayPal 安全结算（默认沙盒环境）。"
-      : "Subscriptions and credit packs. Secure checkout with PayPal (sandbox by default).",
+      ? "订阅与点数包。价格单位：USD。"
+      : "Subscriptions and credit packs. All prices are in USD.",
   }
 
   const subscriptionPlans: Plan[] = [
     {
-      name: isZh ? "免费版" : "Free",
-      description: isZh ? "快速体验 Sakura AI" : "Try Sakura AI quickly",
-      priceLabel: "",
+      name: isZh ? "免费" : "Free",
+      description: isZh ? "每日免费额度" : "Daily free credits",
+      priceMain: "$0",
       features: [
+        isZh
+          ? "每日刷新 100 积分（约 2 次图片生成）"
+          : "100 credits refreshed daily (about 2 image generations)",
         isZh ? "基础图像编辑" : "Basic image editing",
         isZh ? "标准队列" : "Standard queue",
-        isZh ? "社区支持" : "Community support",
       ],
       ctaLabel: isZh ? "开始使用" : "Get started",
       ctaType: "link",
       href: "/account",
     },
     {
-      name: isZh ? "专业版" : "Pro",
-      description: isZh ? "更快处理 + 优先支持" : "Priority processing + support",
-      priceLabel: ".99",
-      amount: 0.99,
+      name: "Pro",
+      description: isZh ? "适合高频创作" : "For frequent creators",
+      priceMain: billingCycle === "monthly" ? "$14.9" : "$118.8",
+      priceSuffix: billingCycle === "monthly" ? (isZh ? "/月" : "/Monthly") : isZh ? "/按年" : "/yearly",
+      priceDetail:
+        billingCycle === "yearly"
+          ? isZh
+            ? "每月仅9.9$"
+            : "Only $9.9/month"
+          : undefined,
       badge: isZh ? "推荐" : "Popular",
       highlighted: true,
       features: [
-        isZh ? "更高优先级队列" : "Higher priority queue",
-        isZh ? "更稳定的生成体验" : "More stable generation",
+        isZh ? "每月 5000 积分" : "5000 credits per month",
+        isZh ? "按月重置积分" : "Monthly credit reset",
         isZh ? "优先支持" : "Priority support",
       ],
-      ctaLabel: isZh ? "开始使用" : "Get started",
+      ctaLabel: isZh ? "升级订阅" : "Upgrade subscription",
       ctaType: "link",
       href: "/account",
     },
     {
-      name: isZh ? "企业版" : "Business",
-      description: isZh ? "团队与定制需求" : "Teams and custom needs",
-      priceLabel: isZh ? "定制" : "Custom",
+      name: "Max",
+      description: isZh ? "适合重度使用" : "For heavy usage",
+      priceMain: billingCycle === "monthly" ? "$39.9" : "$358.8",
+      priceSuffix: billingCycle === "monthly" ? (isZh ? "/月" : "/Monthly") : isZh ? "/按年" : "/yearly",
+      priceDetail:
+        billingCycle === "yearly"
+          ? isZh
+            ? "每月仅29.9$"
+            : "Only $29.9/month"
+          : undefined,
       features: [
-        isZh ? "团队管理" : "Team management",
-        isZh ? "发票与企业支持" : "Invoices & business support",
-        isZh ? "定制集成" : "Custom integrations",
+        isZh ? "每月 17500 积分" : "17500 credits per month",
+        isZh ? "按月重置积分" : "Monthly credit reset",
+        isZh ? "优先支持" : "Priority support",
       ],
-      ctaLabel: isZh ? "联系销售" : "Contact sales",
+      ctaLabel: isZh ? "升级订阅" : "Upgrade subscription",
       ctaType: "link",
-      href: "mailto:billing@sakura-ai.example?subject=Sakura%20AI%20Business%20Pricing",
+      href: "/account",
     },
   ]
 
   const packPlans: Plan[] = [
     {
-      name: isZh ? "入门点数包" : "Starter Pack",
-      description: isZh ? "适合试用与轻度使用" : "Best for light usage",
-      priceLabel: isZh ? "200 点" : "200 credits",
-      amount: 0.99,
+      name: isZh ? "小额包" : "Small Pack",
+      description: isZh ? "一次性购买" : "One-time purchase",
+      priceMain: "$4.99",
+      amount: 4.99,
       sku: "credits-starter-200",
       features: [
+        isZh ? "750 积分" : "750 credits",
         isZh ? "一次性购买，无自动续费" : "One-time purchase, no auto-renew",
         isZh ? "点数永不过期" : "Credits never expire",
-        isZh ? "解锁核心功能" : "Unlock core features",
       ],
       ctaLabel: isZh ? "PayPal 购买" : "Buy with PayPal",
       ctaType: "paypal",
     },
     {
-      name: isZh ? "成长点数包" : "Growth Pack",
-      description: isZh ? "适合日常创作" : "For regular creators",
-      priceLabel: isZh ? "600 点" : "600 credits",
-      amount: 4.99,
+      name: isZh ? "进阶包" : "Advanced Pack",
+      description: isZh ? "一次性购买" : "One-time purchase",
+      priceMain: "$12.99",
+      amount: 12.99,
       sku: "credits-growth-600",
       badge: isZh ? "最热门" : "Most popular",
       highlighted: true,
       features: [
+        isZh ? "2500 积分" : "2500 credits",
         isZh ? "一次性购买，无自动续费" : "One-time purchase, no auto-renew",
         isZh ? "点数永不过期" : "Credits never expire",
-        isZh ? "更高处理优先级" : "Higher processing priority",
       ],
       ctaLabel: isZh ? "PayPal 购买" : "Buy with PayPal",
       ctaType: "paypal",
     },
     {
-      name: isZh ? "专业点数包" : "Pro Pack",
-      description: isZh ? "高频使用" : "For heavy usage",
-      priceLabel: isZh ? "1500 点" : "1500 credits",
-      amount: 9.99,
+      name: isZh ? "专业包" : "Pro Pack",
+      description: isZh ? "一次性购买" : "One-time purchase",
+      priceMain: "$34.99",
+      amount: 34.99,
       sku: "credits-pro-1500",
       features: [
+        isZh ? "9000 积分" : "9000 credits",
         isZh ? "一次性购买，无自动续费" : "One-time purchase, no auto-renew",
         isZh ? "点数永不过期" : "Credits never expire",
-        isZh ? "优先支持" : "Priority support",
       ],
       ctaLabel: isZh ? "PayPal 购买" : "Buy with PayPal",
       ctaType: "paypal",
@@ -254,6 +281,35 @@ export function PricingPageV2() {
           </div>
 
           <TabsContent value="subscriptions" className="mt-8">
+            <div className="mb-5 flex justify-center">
+              <div className="inline-flex rounded-lg border border-border/60 bg-secondary/50 p-1">
+                <button
+                  type="button"
+                  onClick={() => setBillingCycle("monthly")}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 text-sm transition-colors",
+                    billingCycle === "monthly"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {isZh ? "按月付费" : "Monthly"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBillingCycle("yearly")}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 text-sm transition-colors",
+                    billingCycle === "yearly"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {isZh ? "按年付费" : "Yearly"}
+                </button>
+              </div>
+            </div>
+
             <div className="grid gap-5 md:grid-cols-3">
               {subscriptionPlans.map((p) => (
                 <PlanCard key={p.name} plan={p} />
