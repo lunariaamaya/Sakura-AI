@@ -12,21 +12,21 @@ type CatalogItem = {
 
 export const PAYPAL_CATALOG: Record<PayPalSku, CatalogItem> = {
   "credits-starter-200": {
-    amount: 0.99,
-    currencyCode: "USD",
-    credits: 200,
-    description: "Starter Pack (200 credits)",
-  },
-  "credits-growth-600": {
     amount: 4.99,
     currencyCode: "USD",
-    credits: 600,
-    description: "Growth Pack (600 credits)",
+    credits: 750,
+    description: "Small Pack (750 credits)",
+  },
+  "credits-growth-600": {
+    amount: 12.99,
+    currencyCode: "USD",
+    credits: 2500,
+    description: "Advanced Pack (2500 credits)",
   },
   "credits-pro-1500": {
-    amount: 9.99,
+    amount: 34.99,
     currencyCode: "USD",
-    credits: 1500,
-    description: "Pro Pack (1500 credits)",
+    credits: 9000,
+    description: "Pro Pack (9000 credits)",
   },
 }

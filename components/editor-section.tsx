@@ -47,9 +47,11 @@ export function EditorSection() {
   const rechargePack = {
     title: isZh ? "入门点数包" : "Starter Pack",
     description: isZh ? "200 点积分包" : "200 credits pack",
-    amount: 0.99,
+    amount: 4.99,
     sku: "credits-starter-200",
   }
+  rechargePack.title = isZh ? "小额包" : "Small Pack"
+  rechargePack.description = isZh ? "750 积分包" : "750 credits pack"
 
   const saveDraft = useCallback(
     (nextDraft?: Partial<EditorDraft>) => {
