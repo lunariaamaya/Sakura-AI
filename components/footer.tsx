@@ -90,13 +90,16 @@ export function Footer() {
               {t("footer.legal")}
             </h3>
             <ul className="space-y-2.5">
-              {["footer.privacy", "footer.terms"].map((key) => (
-                <li key={key}>
-                  <a href="#" className="text-sm text-muted-foreground transition-colors hover:text-primary">
-                    {t(key)}
-                  </a>
-                </li>
-              ))}
+              <li>
+                <a href="/privacy" className="text-sm text-muted-foreground transition-colors hover:text-primary">
+                  {t("footer.privacy")}
+                </a>
+              </li>
+              <li>
+                <a href="/terms" className="text-sm text-muted-foreground transition-colors hover:text-primary">
+                  {t("footer.terms")}
+                </a>
+              </li>
             </ul>
           </div>
         </div>
