@@ -129,3 +129,33 @@ export async function consumeUserCredits(userId: string, amount: number) {
     balance: toBalance(updated as CreditsRow),
   }
 }
+
+export async function addPaidCredits(userId: string, amount: number) {
+  const admin = getSupabaseAdminClient() as any
+  const safeAmount = Math.floor(Number(amount))
+
+  if (!Number.isFinite(safeAmount) || safeAmount <= 0) {
+    throw new Error("Invalid credit amount")
+  }
+
+  const row = await getOrCreateCreditsRow(userId)
+  const nextPaidCredits = row.paid_credits + safeAmount
+
+  const { data: updated, error } = await admin
+    .from("user_credits")
+    .update({
+      paid_credits: nextPaidCredits,
+    })
+    .eq("user_id", userId)
+    .select("user_id, free_credits, paid_credits, last_daily_refresh")
+    .single()
+
+  if (error) {
+    throw error
+  }
+
+  return {
+    added: safeAmount,
+    balance: toBalance(updated as CreditsRow),
+  }
+}
