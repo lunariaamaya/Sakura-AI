@@ -20,7 +20,8 @@ function json(status: number, payload: Record<string, JsonValue>) {
 }
 
 function getPaypalBaseUrl() {
-  return Deno.env.get("PAYPAL_ENV") === "live"
+  const mode = (Deno.env.get("PAYPAL_ENV") ?? Deno.env.get("PAYPAL_MODE") ?? "sandbox").toLowerCase()
+  return mode === "live"
     ? "https://api-m.paypal.com"
     : "https://api-m.sandbox.paypal.com"
 }
@@ -34,7 +35,7 @@ function requiredEnv(name: string) {
 function getPaypalCredentials() {
   return {
     clientId: Deno.env.get("PAYPAL_CLIENT_ID") ?? requiredEnv("NEXT_PUBLIC_PAYPAL_CLIENT_ID"),
-    clientSecret: requiredEnv("PAYPAL_CLIENT_SECRET"),
+    clientSecret: Deno.env.get("PAYPAL_CLIENT_SECRET") ?? requiredEnv("PAYPAL_SECRET"),
     webhookId: requiredEnv("PAYPAL_WEBHOOK_ID"),
   }
 }
@@ -118,12 +119,12 @@ function extractOrderMoney(orderPayload: any) {
 async function verifyWebhookSignature(event: PayPalEvent, request: Request) {
   const { webhookId } = getPaypalCredentials()
   const authAlgo = request.headers.get("paypal-auth-algo")
-  const certId = request.headers.get("paypal-cert-id")
+  const certUrl = request.headers.get("paypal-cert-url")
   const transmissionId = request.headers.get("paypal-transmission-id")
   const transmissionSig = request.headers.get("paypal-transmission-sig")
   const transmissionTime = request.headers.get("paypal-transmission-time")
 
-  if (!authAlgo || !certId || !transmissionId || !transmissionSig || !transmissionTime) {
+  if (!authAlgo || !certUrl || !transmissionId || !transmissionSig || !transmissionTime) {
     return false
   }
 
@@ -131,7 +132,7 @@ async function verifyWebhookSignature(event: PayPalEvent, request: Request) {
     method: "POST",
     body: JSON.stringify({
       auth_algo: authAlgo,
-      cert_id: certId,
+      cert_url: certUrl,
       transmission_id: transmissionId,
       transmission_sig: transmissionSig,
       transmission_time: transmissionTime,
@@ -213,24 +214,13 @@ Deno.serve(async (request) => {
       await supabase
         .from("payment_orders")
         .update({
-          status: "webhook_mismatch",
-          webhook_payload: event,
-          mismatch_reason: amountMismatch
-            ? `expected ${expectedAmount} ${expectedCurrency}, got ${amount} ${currency}`
-            : `expected custom_id ${paymentOrder.paypal_custom_id}, got ${customId}`,
+          status: "failed",
+          paypal_event_payload: event,
         })
         .eq("paypal_order_id", orderId)
 
       return json(200, { ok: true, ignored: true, reason: "Webhook validation mismatch", orderId })
     }
-
-    await supabase
-      .from("payment_orders")
-      .update({
-        status: "webhook_received",
-        webhook_payload: event,
-      })
-      .eq("paypal_order_id", orderId)
 
     const { data: rpcResult, error: rpcError } = await supabase.rpc("apply_paypal_order_credit", {
       p_paypal_order_id: orderId,
