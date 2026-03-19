@@ -40,7 +40,7 @@ create or replace function public.apply_paypal_order_credit(
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, private
 as $$
 declare
   v_order public.payment_orders%rowtype;
@@ -59,7 +59,7 @@ begin
   if v_order.credits_granted then
     select free_credits + paid_credits
     into v_total_credits
-    from public.user_credits
+    from private.user_credits
     where user_id = v_order.user_id;
 
     return jsonb_build_object(
@@ -70,7 +70,7 @@ begin
     );
   end if;
 
-  insert into public.user_credits (user_id, free_credits, paid_credits, last_daily_refresh)
+  insert into private.user_credits (user_id, free_credits, paid_credits, last_daily_refresh)
   values (
     v_order.user_id,
     100,
@@ -79,7 +79,7 @@ begin
   )
   on conflict (user_id)
   do update
-    set paid_credits = public.user_credits.paid_credits + excluded.paid_credits;
+    set paid_credits = private.user_credits.paid_credits + excluded.paid_credits;
 
   update public.payment_orders
   set
@@ -91,7 +91,7 @@ begin
 
   select free_credits + paid_credits
   into v_total_credits
-  from public.user_credits
+  from private.user_credits
   where user_id = v_order.user_id;
 
   return jsonb_build_object(
