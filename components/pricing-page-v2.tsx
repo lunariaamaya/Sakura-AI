@@ -158,8 +158,9 @@ export function PricingPageV2() {
         isZh ? "优先支持" : "Priority support",
       ],
       ctaLabel: isZh ? "升级订阅" : "Upgrade subscription",
-      ctaType: "link",
-      href: "/account",
+      ctaType: "paypal",
+      amount: billingCycle === "monthly" ? 14.9 : 118.8,
+      sku: billingCycle === "monthly" ? "sub-pro-monthly" : "sub-pro-yearly",
     },
     {
       name: "Max",
@@ -178,8 +179,9 @@ export function PricingPageV2() {
         isZh ? "优先支持" : "Priority support",
       ],
       ctaLabel: isZh ? "升级订阅" : "Upgrade subscription",
-      ctaType: "link",
-      href: "/account",
+      ctaType: "paypal",
+      amount: billingCycle === "monthly" ? 39.9 : 358.8,
+      sku: billingCycle === "monthly" ? "sub-max-monthly" : "sub-max-yearly",
     },
   ]
 

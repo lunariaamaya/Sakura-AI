@@ -1,145 +1,254 @@
-import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// @ts-nocheck
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
-const PAYPAL_MODE = Deno.env.get("PAYPAL_MODE") || "sandbox";
-const PAYPAL_WEBHOOK_ID = Deno.env.get("PAYPAL_WEBHOOK_ID")!;
-const PAYPAL_CLIENT_ID = Deno.env.get("PAYPAL_CLIENT_ID")!;
-const PAYPAL_SECRET = Deno.env.get("PAYPAL_SECRET")!;
+type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+type PayPalEvent = {
+  id?: string
+  event_type?: string
+  resource?: Record<string, JsonValue>
+}
 
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+function json(status: number, payload: Record<string, JsonValue>) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+    },
+  })
+}
 
-const PAYPAL_API_BASE = PAYPAL_MODE === "live"
-  ? "https://api-m.paypal.com"
-  : "https://api-m.sandbox.paypal.com";
+function getPaypalBaseUrl() {
+  return Deno.env.get("PAYPAL_ENV") === "live"
+    ? "https://api-m.paypal.com"
+    : "https://api-m.sandbox.paypal.com"
+}
 
-async function getPayPalAccessToken(): Promise<string> {
-  const auth = btoa(${PAYPAL_CLIENT_ID}:);
-  const res = await fetch(${PAYPAL_API_BASE}/v1/oauth2/token, {
+function requiredEnv(name: string) {
+  const value = Deno.env.get(name)
+  if (!value) throw new Error(`Missing env: ${name}`)
+  return value
+}
+
+function getPaypalCredentials() {
+  return {
+    clientId: Deno.env.get("PAYPAL_CLIENT_ID") ?? requiredEnv("NEXT_PUBLIC_PAYPAL_CLIENT_ID"),
+    clientSecret: requiredEnv("PAYPAL_CLIENT_SECRET"),
+    webhookId: requiredEnv("PAYPAL_WEBHOOK_ID"),
+  }
+}
+
+async function getPaypalAccessToken() {
+  const { clientId, clientSecret } = getPaypalCredentials()
+  const auth = btoa(`${clientId}:${clientSecret}`)
+  const response = await fetch(`${getPaypalBaseUrl()}/v1/oauth2/token`, {
     method: "POST",
     headers: {
-      "Authorization": Basic ,
+      Authorization: `Basic ${auth}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: "grant_type=client_credentials",
-  });
+  })
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(PayPal token error (): );
+  if (!response.ok) {
+    const detail = await response.text()
+    throw new Error(`PayPal token failed: ${response.status} ${detail}`)
   }
 
-  const data = await res.json();
-  return data.access_token;
+  const data = (await response.json()) as { access_token?: string }
+  if (!data.access_token) throw new Error("PayPal token missing access_token")
+  return data.access_token
 }
 
-async function verifyPayPalWebhook(req: Request, body: string): Promise<boolean> {
-  const accessToken = await getPayPalAccessToken();
-
-  const transmissionId = req.headers.get("paypal-transmission-id");
-  const transmissionTime = req.headers.get("paypal-transmission-time");
-  const certUrl = req.headers.get("paypal-cert-url");
-  const authAlgo = req.headers.get("paypal-auth-algo");
-  const transmissionSig = req.headers.get("paypal-transmission-sig");
-
-  if (!transmissionId || !transmissionTime || !certUrl || !authAlgo || !transmissionSig) {
-    return false;
-  }
-
-  const verifyBody = {
-    transmission_id: transmissionId,
-    transmission_time: transmissionTime,
-    cert_url: certUrl,
-    auth_algo: authAlgo,
-    transmission_sig: transmissionSig,
-    webhook_id: PAYPAL_WEBHOOK_ID,
-    webhook_event: JSON.parse(body),
-  };
-
-  const res = await fetch(${PAYPAL_API_BASE}/v1/notifications/verify-webhook-signature, {
-    method: "POST",
+async function paypalFetch(path: string, init: RequestInit = {}) {
+  const token = await getPaypalAccessToken()
+  return fetch(`${getPaypalBaseUrl()}${path}`, {
+    ...init,
     headers: {
-      "Authorization": Bearer ,
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
+      ...(init.headers ?? {}),
     },
-    body: JSON.stringify(verifyBody),
-  });
-
-  if (!res.ok) {
-    return false;
-  }
-
-  const data = await res.json();
-  return data.verification_status === "SUCCESS";
+  })
 }
 
-serve(async (req) => {
-  try {
-    const body = await req.text();
-
-    const isValid = await verifyPayPalWebhook(req, body);
-    if (!isValid) {
-      console.error("Invalid PayPal webhook signature");
-      return new Response("Invalid signature", { status: 403 });
-    }
-
-    const event = JSON.parse(body);
-    if (event.event_type !== "CHECKOUT.ORDER.COMPLETED") {
-      return new Response("Event not handled", { status: 200 });
-    }
-
-    const orderId = event.resource?.id;
-    const customDataStr = event.resource?.purchase_units?.[0]?.custom_id;
-
-    if (!orderId || typeof orderId !== "string") {
-      console.error("Missing order id on PayPal event");
-      return new Response("Missing order id", { status: 400 });
-    }
-
-    if (!customDataStr) {
-      console.warn("Missing custom_id on PayPal order", { orderId });
-      return new Response("No custom data", { status: 200 });
-    }
-
-    let customData: { user_id?: string; credit_amount?: number };
-    try {
-      customData = JSON.parse(customDataStr);
-    } catch {
-      console.error("Invalid custom_id JSON", { orderId });
-      return new Response("Invalid custom data", { status: 400 });
-    }
-
-    const userId = customData.user_id;
-    const creditAmount = Number(customData.credit_amount);
-
-    if (!userId || !Number.isFinite(creditAmount) || creditAmount <= 0) {
-      console.error("Invalid custom data", { orderId, customData });
-      return new Response("Invalid data", { status: 400 });
-    }
-
-    const { error } = await supabaseAdmin.rpc("admin_add_credits", {
-      p_user_id: userId,
-      p_amount: creditAmount,
-      p_is_paid: true,
-      p_operation_type: "paid_add",
-      p_related_order_id: orderId,
-      p_remark: PayPal order  credited  credits,
-    });
-
-    if (error) {
-      console.error("Failed to add credits:", error);
-      return new Response("Internal Server Error", { status: 500 });
-    }
-
-    console.log(Successfully added  credits to user );
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { "Content-Type": "application/json" },
-      status: 200,
-    });
-  } catch (err) {
-    console.error("Unexpected error:", err);
-    return new Response("Internal Server Error", { status: 500 });
+function getOrderIdFromEvent(event: PayPalEvent) {
+  const resource = event.resource ?? {}
+  if (
+    event.event_type === "CHECKOUT.ORDER.COMPLETED" &&
+    typeof resource.id === "string" &&
+    resource.id.length > 0
+  ) {
+    return resource.id
   }
-});
+
+  const relatedOrderId =
+    (resource.supplementary_data as Record<string, JsonValue> | undefined)
+      ?.related_ids as Record<string, JsonValue> | undefined
+  if (typeof relatedOrderId?.order_id === "string" && relatedOrderId.order_id.length > 0) {
+    return relatedOrderId.order_id
+  }
+
+  return null
+}
+
+function toTwoDecimalNumber(value: unknown) {
+  if (typeof value === "number") return Number(value.toFixed(2))
+  if (typeof value !== "string") return null
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return null
+  return Number(parsed.toFixed(2))
+}
+
+function extractOrderMoney(orderPayload: any) {
+  const unit = Array.isArray(orderPayload?.purchase_units) ? orderPayload.purchase_units[0] : null
+  const capture =
+    Array.isArray(unit?.payments?.captures) && unit.payments.captures.length > 0
+      ? unit.payments.captures[0]
+      : null
+
+  const amount = toTwoDecimalNumber(capture?.amount?.value ?? unit?.amount?.value)
+  const currency = (capture?.amount?.currency_code ?? unit?.amount?.currency_code ?? null) as string | null
+  const customId = (unit?.custom_id ?? null) as string | null
+
+  return { amount, currency, customId }
+}
+
+async function verifyWebhookSignature(event: PayPalEvent, request: Request) {
+  const { webhookId } = getPaypalCredentials()
+  const authAlgo = request.headers.get("paypal-auth-algo")
+  const certId = request.headers.get("paypal-cert-id")
+  const transmissionId = request.headers.get("paypal-transmission-id")
+  const transmissionSig = request.headers.get("paypal-transmission-sig")
+  const transmissionTime = request.headers.get("paypal-transmission-time")
+
+  if (!authAlgo || !certId || !transmissionId || !transmissionSig || !transmissionTime) {
+    return false
+  }
+
+  const response = await paypalFetch("/v1/notifications/verify-webhook-signature", {
+    method: "POST",
+    body: JSON.stringify({
+      auth_algo: authAlgo,
+      cert_id: certId,
+      transmission_id: transmissionId,
+      transmission_sig: transmissionSig,
+      transmission_time: transmissionTime,
+      webhook_id: webhookId,
+      webhook_event: event,
+    }),
+  })
+
+  if (!response.ok) {
+    const detail = await response.text()
+    throw new Error(`PayPal signature verification failed: ${response.status} ${detail}`)
+  }
+
+  const data = (await response.json()) as { verification_status?: string }
+  return data.verification_status === "SUCCESS"
+}
+
+Deno.serve(async (request) => {
+  if (request.method !== "POST") {
+    return json(405, { ok: false, error: "Method not allowed" })
+  }
+
+  let event: PayPalEvent
+  try {
+    event = (await request.json()) as PayPalEvent
+  } catch {
+    return json(400, { ok: false, error: "Invalid JSON payload" })
+  }
+
+  try {
+    const verified = await verifyWebhookSignature(event, request)
+    if (!verified) {
+      return json(401, { ok: false, error: "Invalid PayPal webhook signature" })
+    }
+
+    const eventType = event.event_type ?? "UNKNOWN"
+    if (eventType !== "CHECKOUT.ORDER.COMPLETED" && eventType !== "PAYMENT.CAPTURE.COMPLETED") {
+      return json(200, { ok: true, ignored: true, reason: `Unhandled event: ${eventType}` })
+    }
+
+    const orderId = getOrderIdFromEvent(event)
+    if (!orderId) {
+      return json(200, { ok: true, ignored: true, reason: "No order_id in webhook event" })
+    }
+
+    const supabase = createClient(requiredEnv("SUPABASE_URL"), requiredEnv("SUPABASE_SERVICE_ROLE_KEY"), {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
+
+    const { data: paymentOrder, error: readError } = await supabase
+      .from("payment_orders")
+      .select("*")
+      .eq("paypal_order_id", orderId)
+      .maybeSingle()
+
+    if (readError) {
+      throw new Error(`Read payment_orders failed: ${readError.message}`)
+    }
+    if (!paymentOrder) {
+      return json(200, { ok: true, ignored: true, reason: "Unknown order", orderId })
+    }
+
+    const orderResponse = await paypalFetch(`/v2/checkout/orders/${orderId}`, { method: "GET" })
+    if (!orderResponse.ok) {
+      const detail = await orderResponse.text()
+      throw new Error(`Read PayPal order failed: ${orderResponse.status} ${detail}`)
+    }
+
+    const orderPayload = await orderResponse.json()
+    const { amount, currency, customId } = extractOrderMoney(orderPayload)
+    const expectedAmount = toTwoDecimalNumber(paymentOrder.expected_amount)
+    const expectedCurrency = paymentOrder.expected_currency as string
+
+    const amountMismatch =
+      amount === null || expectedAmount === null || currency !== expectedCurrency || amount !== expectedAmount
+    const customIdMismatch = !customId || customId !== paymentOrder.paypal_custom_id
+
+    if (amountMismatch || customIdMismatch) {
+      await supabase
+        .from("payment_orders")
+        .update({
+          status: "webhook_mismatch",
+          webhook_payload: event,
+          mismatch_reason: amountMismatch
+            ? `expected ${expectedAmount} ${expectedCurrency}, got ${amount} ${currency}`
+            : `expected custom_id ${paymentOrder.paypal_custom_id}, got ${customId}`,
+        })
+        .eq("paypal_order_id", orderId)
+
+      return json(200, { ok: true, ignored: true, reason: "Webhook validation mismatch", orderId })
+    }
+
+    await supabase
+      .from("payment_orders")
+      .update({
+        status: "webhook_received",
+        webhook_payload: event,
+      })
+      .eq("paypal_order_id", orderId)
+
+    const { data: rpcResult, error: rpcError } = await supabase.rpc("apply_paypal_order_credit", {
+      p_paypal_order_id: orderId,
+      p_paypal_event_payload: event,
+    })
+
+    if (rpcError) {
+      throw new Error(`apply_paypal_order_credit failed: ${rpcError.message}`)
+    }
+
+    return json(200, {
+      ok: true,
+      orderId,
+      eventType,
+      result: rpcResult as JsonValue,
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown webhook error"
+    return json(500, { ok: false, error: message })
+  }
+})
