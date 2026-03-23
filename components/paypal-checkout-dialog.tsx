@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { Loader2 } from "lucide-react"
 
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { useI18n } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -47,6 +48,23 @@ function loadPayPalSdk(clientId: string, currencyCode: string) {
   document.body.appendChild(script)
 }
 
+function extractTotalCredits(data: unknown): number | null {
+  const row = Array.isArray(data) ? data[0] : data
+  if (!row || typeof row !== "object") return null
+  const free = Number((row as any)?.free_credits ?? (row as any)?.freeCredits ?? 0)
+  const paid = Number((row as any)?.paid_credits ?? (row as any)?.paidCredits ?? 0)
+  const total = Number((row as any)?.total_credits ?? (row as any)?.totalCredits ?? free + paid)
+  return Number.isFinite(total) ? total : null
+}
+
+function broadcastCredits(totalCredits: number) {
+  window.dispatchEvent(
+    new CustomEvent("credits-updated", {
+      detail: { totalCredits },
+    }),
+  )
+}
+
 export function PayPalCheckoutDialog({
   title,
   description,
@@ -57,6 +75,7 @@ export function PayPalCheckoutDialog({
   disabled,
   className,
 }: Props) {
+  const { t } = useI18n()
   const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID
   const containerRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
@@ -76,8 +95,7 @@ export function PayPalCheckoutDialog({
     if (!clientId) {
       setStatus({
         type: "error",
-        message:
-          "Missing NEXT_PUBLIC_PAYPAL_CLIENT_ID. Please set it in .env.local.",
+        message: t("paypal.error.missingClientId"),
       })
       return
     }
@@ -92,7 +110,7 @@ export function PayPalCheckoutDialog({
       if (Date.now() - startedAt > 15000) {
         setStatus({
           type: "error",
-          message: "Timed out loading PayPal. Please try again.",
+          message: t("paypal.error.timeout"),
         })
         window.clearInterval(interval)
         return
@@ -106,7 +124,7 @@ export function PayPalCheckoutDialog({
       window.paypal.Buttons({
         createOrder: async () => {
           if (!sku) {
-            throw new Error("Missing product sku")
+            throw new Error(t("paypal.error.missingSku"))
           }
           const res = await fetch("/api/paypal/create-order", {
             method: "POST",
@@ -117,13 +135,13 @@ export function PayPalCheckoutDialog({
           })
           const json = (await res.json()) as { id?: string; error?: string }
           if (!res.ok || !json.id) {
-            throw new Error(json.error || "Failed to create PayPal order")
+            throw new Error(json.error || t("paypal.error.createOrderFailed"))
           }
           return json.id
         },
         onApprove: async (data: { orderID?: string }) => {
           const orderId = data.orderID
-          if (!orderId) throw new Error("Missing orderID")
+          if (!orderId) throw new Error(t("paypal.error.missingOrderId"))
 
           const res = await fetch("/api/paypal/capture-order", {
             method: "POST",
@@ -131,35 +149,38 @@ export function PayPalCheckoutDialog({
             body: JSON.stringify({ orderId }),
           })
           const json = (await res.json()) as { error?: string }
-          if (!res.ok) throw new Error(json.error || "Capture failed")
+          if (!res.ok) throw new Error(json.error || t("paypal.error.captureFailed"))
 
           setStatus({ type: "success" })
 
           try {
             const supabase = getSupabaseBrowserClient()
             const { data } = await supabase.rpc("get_my_credits")
-            const row = Array.isArray(data) ? data[0] : data
-            const free = Number((row as any)?.free_credits ?? (row as any)?.freeCredits ?? 0)
-            const paid = Number((row as any)?.paid_credits ?? (row as any)?.paidCredits ?? 0)
-            const total = Number(
-              (row as any)?.total_credits ?? (row as any)?.totalCredits ?? (free + paid),
-            )
-            if (Number.isFinite(total)) {
-              window.dispatchEvent(
-                new CustomEvent("credits-updated", {
-                  detail: { totalCredits: total },
-                }),
-              )
+            const total = extractTotalCredits(data)
+            if (typeof total === "number") {
+              broadcastCredits(total)
             }
+
+            window.setTimeout(async () => {
+              try {
+                const { data: delayedData } = await supabase.rpc("get_my_credits")
+                const delayedTotal = extractTotalCredits(delayedData)
+                if (typeof delayedTotal === "number") {
+                  broadcastCredits(delayedTotal)
+                }
+              } catch {
+                // Ignore delayed refresh failures.
+              }
+            }, 5000)
           } catch {
             // Ignore refresh failures (credits can be fetched later).
           }
         },
         onCancel: () => {
-          setStatus({ type: "ready" })
+          setStatus({ type: "error", message: t("paypal.status.cancel") })
         },
         onError: (err: unknown) => {
-          const message = err instanceof Error ? err.message : "PayPal error"
+          const message = err instanceof Error ? err.message : t("paypal.error.generic")
           setStatus({ type: "error", message })
         },
       }).render(containerRef.current)
@@ -172,7 +193,7 @@ export function PayPalCheckoutDialog({
       cancelled = true
       window.clearInterval(interval)
     }
-  }, [open, clientId, currencyCode, amountFixed, title, sku])
+  }, [open, clientId, currencyCode, amountFixed, title, sku, t])
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -191,7 +212,7 @@ export function PayPalCheckoutDialog({
         </DialogHeader>
 
         <div className="rounded-lg border border-border/60 bg-card/50 p-4">
-          <div className="text-sm text-muted-foreground">Total</div>
+          <div className="text-sm text-muted-foreground">{t("paypal.total")}</div>
           <div className="mt-1 text-2xl font-semibold">
             ${amountFixed.toFixed(2)} {currencyCode}
           </div>
@@ -200,19 +221,19 @@ export function PayPalCheckoutDialog({
         {status.type === "loading" ? (
           <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" />
-            Loading PayPal...
+            {t("paypal.loading")}
           </div>
         ) : null}
 
         {status.type === "error" ? (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+          <div className="rounded-lg border border-rose-500/40 bg-rose-500/10 p-3 text-sm text-rose-700 dark:text-rose-300">
             {status.message}
           </div>
         ) : null}
 
         {status.type === "success" ? (
-          <div className="rounded-lg border border-primary/25 bg-primary/5 p-3 text-sm">
-            Payment successful.
+          <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">
+            {t("paypal.status.success")}
           </div>
         ) : null}
 

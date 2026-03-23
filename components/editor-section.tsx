@@ -157,21 +157,6 @@ export function EditorSection() {
       return
     }
 
-    const { error: consumeError } = await supabase.rpc("consume_credits", {
-      p_amount: CREDIT_COST,
-      p_remark: "使用AI功能",
-    })
-
-    if (consumeError) {
-      setError(
-        consumeError.message?.toLowerCase().includes("insufficient")
-          ? t("editor.error.insufficient")
-          : consumeError.message,
-      )
-      setShowRechargeHint(true)
-      return
-    }
-
     setError(null)
     setShowRechargeHint(false)
     setIsGenerating(true)
@@ -196,11 +181,6 @@ export function EditorSection() {
       } else {
         requestInit.headers = { "Content-Type": "application/json" }
         requestInit.body = JSON.stringify({ prompt })
-      }
-
-      requestInit.headers = {
-        ...(requestInit.headers ?? {}),
-        "x-credits-consumed": "1",
       }
 
       const res = await fetch("/api/generate-image", requestInit)
@@ -236,8 +216,11 @@ export function EditorSection() {
 
       setOutputImages(data.images)
       window.localStorage.removeItem(EDITOR_DRAFT_KEY)
-      const { data: latestCredits } = await supabase.rpc("get_my_credits")
-      const refreshedTotal = extractTotalCredits(latestCredits)
+      let refreshedTotal = Number(data?.remainingCredits)
+      if (!Number.isFinite(refreshedTotal)) {
+        const { data: latestCredits } = await supabase.rpc("get_my_credits")
+        refreshedTotal = extractTotalCredits(latestCredits)
+      }
       window.dispatchEvent(
         new CustomEvent("credits-updated", {
           detail: { totalCredits: refreshedTotal },
