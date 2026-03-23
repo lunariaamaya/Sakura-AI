@@ -150,8 +150,6 @@ export async function POST(req: Request) {
   const blockedByRateLimit = enforceRateLimit(req, "generate-image", 20, 60_000)
   if (blockedByRateLimit) return blockedByRateLimit
 
-  const clientConsumed = req.headers.get("x-credits-consumed") === "1"
-
   const supabase = await createSupabaseServerClient()
   const {
     data: { user },
@@ -169,25 +167,23 @@ export async function POST(req: Request) {
   }
 
   let currentCredits
-  if (!clientConsumed) {
-    try {
-      currentCredits = await getUserCredits(user.id)
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to load credits"
-      return NextResponse.json({ error: message }, { status: 500 })
-    }
+  try {
+    currentCredits = await getUserCredits(user.id)
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to load credits"
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
 
-    if (currentCredits.totalCredits < IMAGE_GENERATION_COST) {
-      return NextResponse.json(
-        {
-          error: "Insufficient credits. Please recharge to continue.",
-          code: "INSUFFICIENT_CREDITS",
-          remainingCredits: currentCredits.totalCredits,
-        },
-        { status: 402 },
-      )
-    }
+  if (currentCredits.totalCredits < IMAGE_GENERATION_COST) {
+    return NextResponse.json(
+      {
+        error: "Insufficient credits. Please recharge to continue.",
+        code: "INSUFFICIENT_CREDITS",
+        remainingCredits: currentCredits.totalCredits,
+      },
+      { status: 402 },
+    )
   }
 
   const apiKey = process.env.OPENROUTER_API_KEY
@@ -308,41 +304,30 @@ export async function POST(req: Request) {
     )
   }
 
-  let remainingCredits: number | null = null
-  if (!clientConsumed) {
-    let consumeResult
-    try {
-      consumeResult = await consumeUserCredits(user.id, IMAGE_GENERATION_COST)
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to consume credits"
-      return NextResponse.json({ error: message }, { status: 500 })
-    }
-
-    if (!consumeResult.ok) {
-      return NextResponse.json(
-        {
-          error: "Insufficient credits. Please recharge to continue.",
-          code: "INSUFFICIENT_CREDITS",
-          remainingCredits: consumeResult.balance.totalCredits,
-        },
-        { status: 402 },
-      )
-    }
-
-    remainingCredits = consumeResult.balance.totalCredits
-  } else {
-    try {
-      const latestCredits = await getUserCredits(user.id)
-      remainingCredits = latestCredits.totalCredits
-    } catch {
-      remainingCredits = null
-    }
+  let consumeResult
+  try {
+    consumeResult = await consumeUserCredits(user.id, IMAGE_GENERATION_COST)
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to consume credits"
+    return NextResponse.json({ error: message }, { status: 500 })
   }
+
+  if (!consumeResult.ok) {
+    return NextResponse.json(
+      {
+        error: "Insufficient credits. Please recharge to continue.",
+        code: "INSUFFICIENT_CREDITS",
+        remainingCredits: consumeResult.balance.totalCredits,
+      },
+      { status: 402 },
+    )
+  }
+  const remainingCredits = consumeResult.balance.totalCredits
 
   return NextResponse.json({
     images,
     remainingCredits,
-    spentCredits: clientConsumed ? null : IMAGE_GENERATION_COST,
+    spentCredits: IMAGE_GENERATION_COST,
   })
 }
